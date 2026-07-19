@@ -1,0 +1,4 @@
+import { NextResponse, type NextRequest } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+
+export async function GET(request:NextRequest){const url=new URL(request.url);const code=url.searchParams.get("code");const invite=url.searchParams.get("invite");const name=url.searchParams.get("name");const supabase=await createClient();if(code){const {error}=await supabase.auth.exchangeCodeForSession(code);if(error)return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(error.message)}`,url.origin))}if(invite&&name){const {error}=await supabase.rpc("accept_staff_invite",{p_token:invite,p_name:name});if(error)return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(error.message)}`,url.origin))}return NextResponse.redirect(new URL("/app",url.origin))}
