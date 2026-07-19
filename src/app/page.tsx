@@ -1,14 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   Bell, BookOpen, CalendarDays, Check, ChevronDown, ChevronRight, ClipboardCheck,
   Clock3, FileBarChart, GraduationCap, Home, Languages, Menu, MessageCircle,
   Copy, LogOut, MoreHorizontal, Plus, Search, Settings, ShieldCheck, Sparkles, UserPlus, Users, X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import SetupView, { type ClassData, type OfferingData, type PeriodData, type StaffData } from "@/components/setup-view";
 
-type View = "Dashboard" | "Students" | "Attendance" | "Discipline" | "Grades" | "Schedule" | "Mentoring" | "Reports" | "Staff";
+type View = "Dashboard" | "Students" | "Attendance" | "Discipline" | "Grades" | "Schedule" | "Mentoring" | "Reports" | "Staff" | "Setup";
 
 const nav: { label: View; icon: typeof Home }[] = [
   { label: "Dashboard", icon: Home }, { label: "Students", icon: Users },
@@ -16,6 +17,7 @@ const nav: { label: View; icon: typeof Home }[] = [
   { label: "Grades", icon: GraduationCap }, { label: "Schedule", icon: CalendarDays },
   { label: "Mentoring", icon: MessageCircle }, { label: "Reports", icon: FileBarChart },
   { label: "Staff", icon: UserPlus },
+  { label: "Setup", icon: Settings },
 ];
 
 export type StudentRow={id?:string;name:string;year:string;status:string;grade:number;mentor:string};
@@ -79,6 +81,8 @@ function GenericView({view}:{view:View}){const content:Record<string,[string,str
 
 function PageTitle({title,subtitle,action}:{title:string,subtitle:string,action?:string}){return <div className="page-title"><div><h1>{title}</h1><p>{subtitle}</p></div>{action&&<button className="primary"><Plus size={18}/>{action}</button>}</div>}
 
-export function AppShell({profileName="Rabbi Cohen",roles=["principal"],schoolId,initialStudents=students}:{profileName?:string;roles?:string[];schoolId?:string;initialStudents?:StudentRow[]}){const [view,setView]=useState<View>("Dashboard");const [rtl,setRtl]=useState(false);const [mobile,setMobile]=useState(false);const isPrincipal=roles.includes("principal");const allowed=nav.filter(item=>isPrincipal||(roles.includes("mashpia")?["Dashboard","Students","Mentoring","Reports"].includes(item.label):item.label!=="Staff"));const content=useMemo(()=>view==="Dashboard"?<Dashboard onView={setView} name={profileName}/>:view==="Students"?<StudentsView initialStudents={initialStudents} isPrincipal={isPrincipal} schoolId={schoolId}/>:view==="Attendance"?<AttendanceView/>:view==="Discipline"?<DisciplineView/>:view==="Staff"?<StaffView/>:<GenericView view={view}/>,[view,profileName,initialStudents,isPrincipal,schoolId]);async function signOut(){await createClient().auth.signOut();location.href="/login"}return <div className="app" dir={rtl?"rtl":"ltr"}><aside className={mobile?"sidebar open":"sidebar"}><div className="side-top"><Logo/><button className="close-mobile" onClick={()=>setMobile(false)}><X/></button></div><nav>{allowed.map(({label,icon:Icon})=><button key={label} className={view===label?"active":""} onClick={()=>{setView(label);setMobile(false)}}><Icon/><span>{label}</span>{label==="Discipline"&&<em>7</em>}</button>)}</nav><div className="side-bottom"><button><Settings/><span>Settings</span></button><button onClick={signOut}><LogOut/><span>Sign out</span></button></div></aside>{mobile&&<button className="backdrop" onClick={()=>setMobile(false)} aria-label="Close menu"/>}<div className="shell"><header><button className="menu-btn" onClick={()=>setMobile(true)}><Menu/></button><div className="mobile-logo"><Logo/></div><div className="header-search"><Search/><input placeholder="Search students, classes…"/></div><div className="header-actions"><button className="lang" onClick={()=>setRtl(!rtl)}><Languages/><span>{rtl?"English":"עברית"}</span></button><button className="bell"><Bell/><i>3</i></button><div className="profile"><span className="avatar">{profileName.split(" ").map(n=>n[0]).slice(0,2).join("")}</span><div><b>{profileName}</b><small>{roles.map(r=>r[0].toUpperCase()+r.slice(1)).join(" · ")}</small></div><ChevronDown size={16}/></div></div></header><main>{content}</main></div></div>}
+export type SetupBundle={periods:PeriodData[];classes:ClassData[];staff:StaffData[];offerings:OfferingData[]};
+
+export function AppShell({profileName="Rabbi Cohen",roles=["principal"],schoolId,initialStudents=students,setupData={periods:[],classes:[],staff:[],offerings:[]}}:{profileName?:string;roles?:string[];schoolId?:string;initialStudents?:StudentRow[];setupData?:SetupBundle}){const [view,setView]=useState<View>("Dashboard");const [rtl,setRtl]=useState(false);const [mobile,setMobile]=useState(false);const isPrincipal=roles.includes("principal");const allowed=nav.filter(item=>(item.label!=="Setup"||!!schoolId)&&(isPrincipal||(roles.includes("mashpia")?["Dashboard","Students","Mentoring","Reports"].includes(item.label):!["Staff","Setup"].includes(item.label))));const content=view==="Dashboard"?<Dashboard onView={setView} name={profileName}/>:view==="Students"?<StudentsView initialStudents={initialStudents} isPrincipal={isPrincipal} schoolId={schoolId}/>:view==="Attendance"?<AttendanceView/>:view==="Discipline"?<DisciplineView/>:view==="Staff"?<StaffView/>:view==="Setup"&&schoolId?<SetupView schoolId={schoolId} {...setupData}/>:<GenericView view={view}/>;async function signOut(){await createClient().auth.signOut();location.href="/login"}return <div className="app" dir={rtl?"rtl":"ltr"}><aside className={mobile?"sidebar open":"sidebar"}><div className="side-top"><Logo/><button className="close-mobile" onClick={()=>setMobile(false)}><X/></button></div><nav>{allowed.map(({label,icon:Icon})=><button key={label} className={view===label?"active":""} onClick={()=>{setView(label);setMobile(false)}}><Icon/><span>{label}</span>{label==="Discipline"&&<em>7</em>}</button>)}</nav><div className="side-bottom"><button><Settings/><span>Settings</span></button><button onClick={signOut}><LogOut/><span>Sign out</span></button></div></aside>{mobile&&<button className="backdrop" onClick={()=>setMobile(false)} aria-label="Close menu"/>}<div className="shell"><header><button className="menu-btn" onClick={()=>setMobile(true)}><Menu/></button><div className="mobile-logo"><Logo/></div><div className="header-search"><Search/><input placeholder="Search students, classes…"/></div><div className="header-actions"><button className="lang" onClick={()=>setRtl(!rtl)}><Languages/><span>{rtl?"English":"עברית"}</span></button><button className="bell"><Bell/><i>3</i></button><div className="profile"><span className="avatar">{profileName.split(" ").map(n=>n[0]).slice(0,2).join("")}</span><div><b>{profileName}</b><small>{roles.map(r=>r[0].toUpperCase()+r.slice(1)).join(" · ")}</small></div><ChevronDown size={16}/></div></div></header><main>{content}</main></div></div>}
 
 export default function HomePage(){return <AppShell/>}
