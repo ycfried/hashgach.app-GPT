@@ -668,6 +668,56 @@ function Requests({
     }
     setStats(stats.map((r) => (r.id === row.id ? data : r)));
   }
+  async function withdraw(
+    item:
+      | { kind: "notes"; row: NoteRequest }
+      | { kind: "stats"; row: StatsRequest },
+  ) {
+    const table =
+      item.kind === "notes" ? "note_requests" : "stats_access_requests";
+    const changes =
+      item.kind === "notes"
+        ? { status: "denied" }
+        : { status: "denied", responded_at: new Date().toISOString() };
+    const { data, error } = await createClient()
+      .from(table)
+      .update(changes)
+      .eq("id", item.row.id)
+      .select("*")
+      .single();
+    if (error) {
+      onError(error.message);
+      return;
+    }
+    if (item.kind === "notes")
+      setNotes(notes.map((r) => (r.id === data.id ? data : r)));
+    else setStats(stats.map((r) => (r.id === data.id ? data : r)));
+  }
+  async function endAccess(
+    item:
+      | { kind: "notes"; row: NoteRequest }
+      | { kind: "stats"; row: StatsRequest },
+  ) {
+    const table =
+      item.kind === "notes" ? "note_requests" : "stats_access_requests";
+    const changes =
+      item.kind === "notes"
+        ? { ended_early_at: new Date().toISOString() }
+        : { revoked_at: new Date().toISOString(), revoked_by: userId };
+    const { data, error } = await createClient()
+      .from(table)
+      .update(changes)
+      .eq("id", item.row.id)
+      .select("*")
+      .single();
+    if (error) {
+      onError(error.message);
+      return;
+    }
+    if (item.kind === "notes")
+      setNotes(notes.map((r) => (r.id === data.id ? data : r)));
+    else setStats(stats.map((r) => (r.id === data.id ? data : r)));
+  }
   return (
     <>
       <div className="request-actions">
@@ -769,7 +819,11 @@ function Requests({
                     <span
                       className={`status ${item.status === "approved" || item.status === "accepted" ? "good" : item.status === "denied" ? "bad" : "warn"}`}
                     >
-                      {item.status}
+                      {item.kind === "notes" && item.row.ended_early_at
+                        ? "ended"
+                        : item.kind === "stats" && item.row.revoked_at
+                          ? "revoked"
+                          : item.status}
                     </span>
                   </td>
                   <td>
@@ -799,6 +853,29 @@ function Requests({
                           Deny
                         </button>
                       </div>
+                    ) : item.status === "pending" &&
+                      ((item.kind === "notes" && isPrincipal) ||
+                        (item.kind === "stats" && isMashpia)) ? (
+                      <button
+                        className="icon-btn danger"
+                        onClick={() => withdraw(item)}
+                      >
+                        Withdraw
+                      </button>
+                    ) : (item.kind === "notes" &&
+                        item.status === "accepted" &&
+                        !item.row.ended_early_at &&
+                        !isPrincipal) ||
+                      (item.kind === "stats" &&
+                        item.status === "approved" &&
+                        !item.row.revoked_at &&
+                        isPrincipal) ? (
+                      <button
+                        className="icon-btn danger"
+                        onClick={() => endAccess(item)}
+                      >
+                        End access
+                      </button>
                     ) : (
                       "—"
                     )}
