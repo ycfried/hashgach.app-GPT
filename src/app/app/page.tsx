@@ -5,6 +5,7 @@ import type { AttendanceBundle } from "@/components/attendance-view";
 import type { DisciplineBundle } from "@/components/discipline-view";
 import type { GradesBundle } from "@/components/grades-view";
 import type { ScheduleBundle } from "@/components/schedule-view";
+import type { MentoringBundle } from "@/components/mentoring-view";
 
 export default async function ProtectedApp(){
   const supabase=await createClient();
@@ -14,7 +15,7 @@ export default async function ProtectedApp(){
   if(!staff)redirect("/login?error=Your+staff+invitation+has+not+been+accepted");
   const isPrincipal=(staff.roles||[]).includes("principal");
   const today=new Date().toISOString().slice(0,10);const weekday=new Date().getDay();
-  const [studentResult,periodResult,classResult,staffResult,offeringResult,assignmentResult,sessionResult,typeResult,disciplineResult,schoolResult,zmanResult,testResult,gradeResult,bankResult,transferResult,scheduleTemplateResult,scheduleBlockResult,scheduleInstanceResult]=await Promise.all([
+  const [studentResult,periodResult,classResult,staffResult,offeringResult,assignmentResult,sessionResult,typeResult,disciplineResult,schoolResult,zmanResult,testResult,gradeResult,bankResult,transferResult,scheduleTemplateResult,scheduleBlockResult,scheduleInstanceResult,mentorAssignmentResult,conversationResult,noteRequestResult,statsRequestResult]=await Promise.all([
     supabase.from("students").select("id,first_name,last_name,year_level").eq("active",true).order("last_name"),
     supabase.from("periods").select("id,name,start_time,end_time").order("sort_order"),
     supabase.from("classes").select("id,name,subject,grade_level").order("name"),
@@ -33,6 +34,10 @@ export default async function ProtectedApp(){
     supabase.from("schedule_templates").select("id,name,default_anchor_time,active").eq("active",true).order("created_at"),
     supabase.from("schedule_blocks").select("id,template_id,name,position,duration_minutes,gap_after_minutes").order("position"),
     supabase.from("schedule_instances").select("id,template_id,date,anchor_start_time,calculated_blocks").order("date",{ascending:false}).limit(30),
+    supabase.from("mentor_assignments").select("id,mentor_id,student_id,source,contact_interval_days,flagged"),
+    supabase.from("mentor_conversations").select("id,mentor_id,student_id,conversation_date,status,notes,shared_with_principal,created_at").order("conversation_date",{ascending:false}),
+    supabase.from("note_requests").select("id,principal_id,mentor_id,student_id,requested_at,requested_duration_days,status,expires_at,ended_early_at").order("requested_at",{ascending:false}),
+    supabase.from("stats_access_requests").select("id,mentor_id,requested_at,status,expires_at,revoked_at").order("requested_at",{ascending:false}),
   ]);
   const sessionIds=(sessionResult.data||[]).map(s=>s.id);
   const recordResult=sessionIds.length?await supabase.from("attendance_records").select("id,attendance_session_id,student_id,status,late_minutes").in("attendance_session_id",sessionIds):{data:[]};
@@ -48,5 +53,6 @@ export default async function ProtectedApp(){
   const disciplineData:DisciplineBundle={types:(typeResult.data||[]) as DisciplineBundle["types"],records:(disciplineResult.data||[]) as DisciplineBundle["records"],students:students.filter(s=>s.id).map(s=>({id:s.id!,name:s.name})),snoozeDays:settings.snooze_days||1,snoozeCap:settings.snooze_cap||3};
   const gradesData:GradesBundle={zmanim:zmanResult.data||[],offerings:(offeringResult.data||[]).map(o=>{const c=(classResult.data||[]).find(x=>x.id===o.class_id);return{id:o.id,name:c?.name||"Class",subject:c?.subject||"",studentIds:(assignmentResult.data||[]).filter(a=>a.class_offering_id===o.id).map(a=>a.student_id)}}),tests:(testResult.data||[]) as GradesBundle["tests"],grades:gradeResult.data||[],banks:bankResult.data||[],transfers:transferResult.data||[],students:students.filter(s=>s.id).map(s=>({id:s.id!,name:s.name}))};
   const scheduleData:ScheduleBundle={templates:scheduleTemplateResult.data||[],blocks:scheduleBlockResult.data||[],instances:(scheduleInstanceResult.data||[]) as ScheduleBundle["instances"]};
-  return <AppShell profileName={staff.name} roles={staff.roles||[]} schoolId={staff.school_id} userId={user.id} initialStudents={students} setupData={setupData} attendanceData={attendanceData} disciplineData={disciplineData} gradesData={gradesData} scheduleData={scheduleData}/>;
+  const mentoringData:MentoringBundle={assignments:(mentorAssignmentResult.data||[]) as MentoringBundle["assignments"],conversations:(conversationResult.data||[]) as MentoringBundle["conversations"],noteRequests:(noteRequestResult.data||[]) as MentoringBundle["noteRequests"],statsRequests:(statsRequestResult.data||[]) as MentoringBundle["statsRequests"],students:students.filter(s=>s.id).map(s=>({id:s.id!,name:s.name,year:s.year})),mentors:(staffResult.data||[]).filter(s=>(s.roles||[]).includes("mashpia")).map(s=>({id:s.id,name:s.name}))};
+  return <AppShell profileName={staff.name} roles={staff.roles||[]} schoolId={staff.school_id} userId={user.id} initialStudents={students} setupData={setupData} attendanceData={attendanceData} disciplineData={disciplineData} gradesData={gradesData} scheduleData={scheduleData} mentoringData={mentoringData}/>;
 }
