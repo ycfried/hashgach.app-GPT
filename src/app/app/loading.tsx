@@ -1,0 +1,1 @@
+export default function AppLoading(){return <main className="app-loading" aria-label="Loading school workspace" aria-busy="true"><div className="loading-title"/><div className="loading-metrics">{[1,2,3,4].map(i=><div key={i}/>)}</div><div className="loading-panels"><div/><div/></div><span className="sr-only">Loading your school data…</span></main>}
