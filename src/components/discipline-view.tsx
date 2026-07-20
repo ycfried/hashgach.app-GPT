@@ -131,6 +131,7 @@ function Catalog({
   setRows: (v: DisciplineType[]) => void;
   onError: (v: string) => void;
 }) {
+  const [editing, setEditing] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState<"punishment" | "reward">(
@@ -142,30 +143,59 @@ function Catalog({
   const [lateness, setLateness] = useState(false);
   const [min, setMin] = useState("15");
   const [max, setMax] = useState("");
-  async function add() {
+  function begin(row: DisciplineType) {
+    setEditing(row.id);
+    setName(row.name);
+    setDescription(row.description || "");
+    setCategory(row.category);
+    setPoints(String(row.points_value));
+    setFine(row.is_fine);
+    setAmount(String(row.base_amount || 5));
+    setLateness(row.late_threshold_min !== null);
+    setMin(String(row.late_threshold_min || 15));
+    setMax(
+      row.late_threshold_max === null ? "" : String(row.late_threshold_max),
+    );
+  }
+  function reset() {
+    setEditing(null);
+    setName("");
+    setDescription("");
+    setCategory("punishment");
+    setPoints("0");
+    setFine(false);
+    setLateness(false);
+  }
+  async function save() {
     onError("");
-    const { data, error } = await createClient()
-      .from("punishment_types")
-      .insert({
-        school_id: schoolId,
-        name: name.trim(),
-        description: description.trim() || null,
-        category,
-        points_value: Number(points) || 0,
-        is_fine: fine,
-        base_amount: fine ? Number(amount) || 0 : null,
-        late_threshold_min: lateness ? Number(min) || 0 : null,
-        late_threshold_max: lateness && max ? Number(max) : null,
-      })
-      .select("*")
-      .single();
+    const values = {
+      name: name.trim(),
+      description: description.trim() || null,
+      category,
+      points_value: Number(points) || 0,
+      is_fine: fine,
+      base_amount: fine ? Number(amount) || 0 : null,
+      late_threshold_min: lateness ? Number(min) || 0 : null,
+      late_threshold_max: lateness && max ? Number(max) : null,
+    };
+    const client = createClient();
+    const query = editing
+      ? client.from("punishment_types").update(values).eq("id", editing)
+      : client.from("punishment_types").insert({
+          school_id: schoolId,
+          ...values,
+        });
+    const { data, error } = await query.select("*").single();
     if (error) {
       onError(error.message);
       return;
     }
-    setRows([...rows, data]);
-    setName("");
-    setDescription("");
+    setRows(
+      editing
+        ? rows.map((r) => (r.id === data.id ? data : r))
+        : [...rows, data],
+    );
+    reset();
   }
   async function toggle(row: DisciplineType) {
     const { error } = await createClient()
@@ -186,7 +216,7 @@ function Catalog({
         <span className="setup-icon">
           <Scale />
         </span>
-        <h2>Add catalog item</h2>
+        <h2>{editing ? "Edit catalog item" : "Add catalog item"}</h2>
         <p>
           Create reusable teacher actions. Lateness-linked items are assigned
           automatically from attendance minutes.
@@ -279,10 +309,18 @@ function Catalog({
             </label>
           </div>
         )}
-        <button className="primary" onClick={add} disabled={!name.trim()}>
-          <Plus />
-          Add item
-        </button>
+        <div className="setup-form-actions">
+          {editing && (
+            <button className="secondary" onClick={reset}>
+              <X />
+              Cancel
+            </button>
+          )}
+          <button className="primary" onClick={save} disabled={!name.trim()}>
+            {editing ? <Pencil /> : <Plus />}
+            {editing ? "Save item" : "Add item"}
+          </button>
+        </div>
       </section>
       <section className="card setup-list">
         <div className="card-head">
@@ -311,6 +349,13 @@ function Catalog({
               </div>
               <button className="tiny-primary" onClick={() => toggle(row)}>
                 {row.active ? "Deactivate" : "Activate"}
+              </button>
+              <button
+                className="icon-action"
+                onClick={() => begin(row)}
+                aria-label={`Edit ${row.name}`}
+              >
+                <Pencil />
               </button>
             </div>
           ))
