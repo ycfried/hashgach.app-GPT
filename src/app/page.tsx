@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Bell,
   BookOpen,
@@ -683,6 +683,26 @@ function StaffView({
   const [editing, setEditing] = useState<string | null>(null);
   const [staffName, setStaffName] = useState("");
   const [staffRole, setStaffRole] = useState("rebbi");
+  const [invitations, setInvitations] = useState<
+    {
+      id: string;
+      email: string;
+      roles: string[];
+      expires_at: string;
+      used_at: string | null;
+    }[]
+  >([]);
+  useEffect(() => {
+    void createClient()
+      .from("invites")
+      .select("id,email,roles,expires_at,used_at")
+      .is("used_at", null)
+      .order("expires_at", { ascending: false })
+      .then(({ data, error }) => {
+        if (error) setError(error.message);
+        else setInvitations(data || []);
+      });
+  }, []);
   function beginStaff(row: StaffData) {
     setEditing(row.id);
     setStaffName(row.name);
@@ -714,6 +734,18 @@ function StaffView({
     }
     setStaff(staff.filter((s) => s.id !== id));
     if (editing === id) setEditing(null);
+  }
+  async function revokeInvite(id: string) {
+    const { error } = await createClient()
+      .from("invites")
+      .delete()
+      .eq("id", id)
+      .is("used_at", null);
+    if (error) {
+      setError(error.message);
+      return;
+    }
+    setInvitations(invitations.filter((i) => i.id !== id));
   }
   async function invite() {
     const parsed = [
@@ -880,6 +912,43 @@ function StaffView({
                 </td>
               </tr>
             ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="card table-card">
+        <table>
+          <thead>
+            <tr>
+              <th>Pending invitation</th>
+              <th>Role</th>
+              <th>Expires</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {invitations.length ? (
+              invitations.map((i) => (
+                <tr key={i.id}>
+                  <td>
+                    <b>{i.email}</b>
+                  </td>
+                  <td>{i.roles.join(", ")}</td>
+                  <td>{new Date(i.expires_at).toLocaleDateString()}</td>
+                  <td>
+                    <button
+                      className="icon-btn danger"
+                      onClick={() => revokeInvite(i.id)}
+                    >
+                      Revoke invitation
+                    </button>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={4}>No pending invitations.</td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
