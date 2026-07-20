@@ -1,0 +1,17 @@
+create index if not exists students_school_active_idx on public.students(school_id,active);
+create index if not exists staff_school_idx on public.staff(school_id);
+create index if not exists class_offerings_rebbi_idx on public.class_offerings(rebbi_id);
+create index if not exists assignments_student_offering_idx on public.student_period_assignments(student_id,class_offering_id);
+create index if not exists attendance_sessions_school_date_idx on public.attendance_sessions(school_id,session_date);
+create index if not exists attendance_records_student_idx on public.attendance_records(student_id);
+create index if not exists attendance_records_session_idx on public.attendance_records(attendance_session_id);
+create index if not exists punishment_records_student_status_idx on public.punishment_records(student_id,status);
+create index if not exists punishment_records_assigned_idx on public.punishment_records(assigned_by);
+create index if not exists grades_student_idx on public.grades(student_id);
+create index if not exists grades_test_idx on public.grades(test_id);
+create index if not exists mentor_assignments_student_mentor_idx on public.mentor_assignments(student_id,mentor_id);
+create index if not exists stats_requests_mentor_status_idx on public.stats_access_requests(mentor_id,status,expires_at);
+create index if not exists report_cards_school_student_idx on public.report_cards(school_id,student_id,generated_at desc);
+create index if not exists chat_messages_school_created_idx on public.chat_messages(school_id,created_at);
+create index if not exists chat_messages_dm_idx on public.chat_messages(sender_id,channel_id) where channel_type='dm';
+create index if not exists audit_log_school_occurred_idx on public.audit_log(school_id,occurred_at desc);
