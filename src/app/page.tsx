@@ -1045,7 +1045,7 @@ export function AppShell({
     students: [],
     assignments: [],
   },
-  attendanceData = { students: [], offerings: [], sessions: [] },
+  attendanceData = { students: [], offerings: [], sessions: [], excusals: [] },
   disciplineData = {
     types: [],
     records: [],
@@ -1163,6 +1163,7 @@ export function AppShell({
       <AttendanceView
         schoolId={schoolId}
         userId={userId}
+        isPrincipal={isPrincipal}
         initial={attendanceData}
       />
     ) : view === "Discipline" && schoolId && userId ? (
