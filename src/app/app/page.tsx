@@ -4,6 +4,7 @@ import { AppShell, type SetupBundle, type StudentRow } from "../page";
 import type { AttendanceBundle } from "@/components/attendance-view";
 import type { DisciplineBundle } from "@/components/discipline-view";
 import type { GradesBundle } from "@/components/grades-view";
+import type { ScheduleBundle } from "@/components/schedule-view";
 
 export default async function ProtectedApp(){
   const supabase=await createClient();
@@ -13,7 +14,7 @@ export default async function ProtectedApp(){
   if(!staff)redirect("/login?error=Your+staff+invitation+has+not+been+accepted");
   const isPrincipal=(staff.roles||[]).includes("principal");
   const today=new Date().toISOString().slice(0,10);const weekday=new Date().getDay();
-  const [studentResult,periodResult,classResult,staffResult,offeringResult,assignmentResult,sessionResult,typeResult,disciplineResult,schoolResult,zmanResult,testResult,gradeResult,bankResult,transferResult]=await Promise.all([
+  const [studentResult,periodResult,classResult,staffResult,offeringResult,assignmentResult,sessionResult,typeResult,disciplineResult,schoolResult,zmanResult,testResult,gradeResult,bankResult,transferResult,scheduleTemplateResult,scheduleBlockResult,scheduleInstanceResult]=await Promise.all([
     supabase.from("students").select("id,first_name,last_name,year_level").eq("active",true).order("last_name"),
     supabase.from("periods").select("id,name,start_time,end_time").order("sort_order"),
     supabase.from("classes").select("id,name,subject,grade_level").order("name"),
@@ -29,6 +30,9 @@ export default async function ProtectedApp(){
     supabase.from("grades").select("id,test_id,student_id,raw_score,applied_bank,final_score"),
     supabase.from("point_bank").select("student_id,subject,zman_id,balance"),
     supabase.from("point_bank_transfers").select("student_id,source_test_id,target_test_id,amount,subject,zman_id"),
+    supabase.from("schedule_templates").select("id,name,default_anchor_time,active").eq("active",true).order("created_at"),
+    supabase.from("schedule_blocks").select("id,template_id,name,position,duration_minutes,gap_after_minutes").order("position"),
+    supabase.from("schedule_instances").select("id,template_id,date,anchor_start_time,calculated_blocks").order("date",{ascending:false}).limit(30),
   ]);
   const sessionIds=(sessionResult.data||[]).map(s=>s.id);
   const recordResult=sessionIds.length?await supabase.from("attendance_records").select("id,attendance_session_id,student_id,status,late_minutes").in("attendance_session_id",sessionIds):{data:[]};
@@ -43,5 +47,6 @@ export default async function ProtectedApp(){
   const settings=(schoolResult.data?.settings||{}) as {snooze_days?:number;snooze_cap?:number};
   const disciplineData:DisciplineBundle={types:(typeResult.data||[]) as DisciplineBundle["types"],records:(disciplineResult.data||[]) as DisciplineBundle["records"],students:students.filter(s=>s.id).map(s=>({id:s.id!,name:s.name})),snoozeDays:settings.snooze_days||1,snoozeCap:settings.snooze_cap||3};
   const gradesData:GradesBundle={zmanim:zmanResult.data||[],offerings:(offeringResult.data||[]).map(o=>{const c=(classResult.data||[]).find(x=>x.id===o.class_id);return{id:o.id,name:c?.name||"Class",subject:c?.subject||"",studentIds:(assignmentResult.data||[]).filter(a=>a.class_offering_id===o.id).map(a=>a.student_id)}}),tests:(testResult.data||[]) as GradesBundle["tests"],grades:gradeResult.data||[],banks:bankResult.data||[],transfers:transferResult.data||[],students:students.filter(s=>s.id).map(s=>({id:s.id!,name:s.name}))};
-  return <AppShell profileName={staff.name} roles={staff.roles||[]} schoolId={staff.school_id} userId={user.id} initialStudents={students} setupData={setupData} attendanceData={attendanceData} disciplineData={disciplineData} gradesData={gradesData}/>;
+  const scheduleData:ScheduleBundle={templates:scheduleTemplateResult.data||[],blocks:scheduleBlockResult.data||[],instances:(scheduleInstanceResult.data||[]) as ScheduleBundle["instances"]};
+  return <AppShell profileName={staff.name} roles={staff.roles||[]} schoolId={staff.school_id} userId={user.id} initialStudents={students} setupData={setupData} attendanceData={attendanceData} disciplineData={disciplineData} gradesData={gradesData} scheduleData={scheduleData}/>;
 }
