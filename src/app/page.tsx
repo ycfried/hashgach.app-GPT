@@ -2,91 +2,1278 @@
 
 import { useState } from "react";
 import {
-  Bell, BookOpen, CalendarDays, ChevronRight, ClipboardCheck,
-  Clock3, FileBarChart, GraduationCap, Home, Languages, Menu, MessageCircle,
-  Copy, LogOut, Plus, Search, Settings, ShieldCheck, Sparkles, UserPlus, Users, X,
+  Bell,
+  BookOpen,
+  CalendarDays,
+  ChevronRight,
+  ClipboardCheck,
+  Clock3,
+  FileBarChart,
+  GraduationCap,
+  Home,
+  Languages,
+  Menu,
+  MessageCircle,
+  Copy,
+  LogOut,
+  Plus,
+  Search,
+  Settings,
+  ShieldCheck,
+  Sparkles,
+  UserPlus,
+  Users,
+  X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import SetupView, { type AssignmentData, type ClassData, type OfferingData, type PeriodData, type SetupStudentData, type StaffData } from "@/components/setup-view";
-import AttendanceView, { type AttendanceBundle } from "@/components/attendance-view";
-import DisciplineView, { type DisciplineBundle } from "@/components/discipline-view";
+import SetupView, {
+  type AssignmentData,
+  type ClassData,
+  type OfferingData,
+  type PeriodData,
+  type SetupStudentData,
+  type StaffData,
+} from "@/components/setup-view";
+import AttendanceView, {
+  type AttendanceBundle,
+} from "@/components/attendance-view";
+import DisciplineView, {
+  type DisciplineBundle,
+} from "@/components/discipline-view";
 import GradesView, { type GradesBundle } from "@/components/grades-view";
 import ScheduleView, { type ScheduleBundle } from "@/components/schedule-view";
-import MentoringView, { type MentoringBundle } from "@/components/mentoring-view";
+import MentoringView, {
+  type MentoringBundle,
+} from "@/components/mentoring-view";
 import ReportsView, { type ReportsBundle } from "@/components/reports-view";
 import ChatView, { type ChatBundle } from "@/components/chat-view";
 import AdminView, { type AdminBundle } from "@/components/admin-view";
 
-type View = "Dashboard" | "Students" | "Attendance" | "Discipline" | "Grades" | "Schedule" | "Mentoring" | "Reports" | "Messages" | "Staff" | "Setup" | "Admin";
+type View =
+  | "Dashboard"
+  | "Students"
+  | "Attendance"
+  | "Discipline"
+  | "Grades"
+  | "Schedule"
+  | "Mentoring"
+  | "Reports"
+  | "Messages"
+  | "Staff"
+  | "Setup"
+  | "Admin";
 
 const nav: { label: View; icon: typeof Home }[] = [
-  { label: "Dashboard", icon: Home }, { label: "Students", icon: Users },
-  { label: "Attendance", icon: ClipboardCheck }, { label: "Discipline", icon: ShieldCheck },
-  { label: "Grades", icon: GraduationCap }, { label: "Schedule", icon: CalendarDays },
-  { label: "Mentoring", icon: MessageCircle }, { label: "Reports", icon: FileBarChart },
+  { label: "Dashboard", icon: Home },
+  { label: "Students", icon: Users },
+  { label: "Attendance", icon: ClipboardCheck },
+  { label: "Discipline", icon: ShieldCheck },
+  { label: "Grades", icon: GraduationCap },
+  { label: "Schedule", icon: CalendarDays },
+  { label: "Mentoring", icon: MessageCircle },
+  { label: "Reports", icon: FileBarChart },
   { label: "Messages", icon: MessageCircle },
   { label: "Staff", icon: UserPlus },
   { label: "Setup", icon: Settings },
 ];
 
-export type StudentRow={id?:string;name:string;year:string;status:string;grade:number;mentor:string};
-const students:StudentRow[] = [
-  { name: "Ari Stein", year: "Shiur Alef", status: "Present", grade: 93, mentor: "Rabbi Cohen" },
-  { name: "Dovid Katz", year: "Shiur Alef", status: "Late · 12m", grade: 88, mentor: "Rabbi Cohen" },
-  { name: "Moshe Levi", year: "Shiur Beis", status: "Excused", grade: 91, mentor: "Rabbi Weiss" },
-  { name: "Yossi Friedman", year: "Shiur Beis", status: "Absent", grade: 84, mentor: "Rabbi Weiss" },
-  { name: "Shmuel Green", year: "Shiur Gimmel", status: "Present", grade: 96, mentor: "Rabbi Adler" },
+export type StudentRow = {
+  id?: string;
+  name: string;
+  year: string;
+  status: string;
+  grade: number;
+  mentor: string;
+};
+const students: StudentRow[] = [
+  {
+    name: "Ari Stein",
+    year: "Shiur Alef",
+    status: "Present",
+    grade: 93,
+    mentor: "Rabbi Cohen",
+  },
+  {
+    name: "Dovid Katz",
+    year: "Shiur Alef",
+    status: "Late · 12m",
+    grade: 88,
+    mentor: "Rabbi Cohen",
+  },
+  {
+    name: "Moshe Levi",
+    year: "Shiur Beis",
+    status: "Excused",
+    grade: 91,
+    mentor: "Rabbi Weiss",
+  },
+  {
+    name: "Yossi Friedman",
+    year: "Shiur Beis",
+    status: "Absent",
+    grade: 84,
+    mentor: "Rabbi Weiss",
+  },
+  {
+    name: "Shmuel Green",
+    year: "Shiur Gimmel",
+    status: "Present",
+    grade: 96,
+    mentor: "Rabbi Adler",
+  },
 ];
 
 function Logo() {
-  return <div className="brand"><span className="brand-mark"><BookOpen size={22}/></span><span>Hashgacha</span></div>;
+  return (
+    <div className="brand">
+      <span className="brand-mark">
+        <BookOpen size={22} />
+      </span>
+      <span>Hashgacha</span>
+    </div>
+  );
 }
 
 function Status({ children }: { children: React.ReactNode }) {
   const text = String(children).toLowerCase();
-  const kind = text.includes("present") || text.includes("progress") || text.includes("exacted") ? "good" : text.includes("absent") || text.includes("overdue") ? "bad" : text.includes("late") || text.includes("pending") ? "warn" : "info";
+  const kind =
+    text.includes("present") ||
+    text.includes("progress") ||
+    text.includes("exacted")
+      ? "good"
+      : text.includes("absent") || text.includes("overdue")
+        ? "bad"
+        : text.includes("late") || text.includes("pending")
+          ? "warn"
+          : "info";
   return <span className={`status ${kind}`}>{children}</span>;
 }
 
-function Dashboard({onView,name,attendance,discipline,grades,mentoring}:{onView:(v:View)=>void;name:string;attendance:AttendanceBundle;discipline:DisciplineBundle;grades:GradesBundle;mentoring:MentoringBundle}) {
-  const records=attendance.sessions.flatMap(s=>s.records);const present=records.filter(r=>r.status==="present").length;const late=records.filter(r=>r.status==="late").length;const absent=records.filter(r=>r.status==="absent").length;const excused=records.filter(r=>r.status==="excused").length;const accountable=present+late+absent;const rate=accountable?Math.round((present+late)*100/accountable):0;const pending=discipline.records.filter(r=>r.status==="pending").length;const average=grades.grades.length?Math.round(grades.grades.reduce((sum,g)=>sum+Number(g.final_score),0)/grades.grades.length):null;const flagged=mentoring.assignments.filter(a=>a.flagged).length;const time=(value:string)=>{const [h,m]=value.split(":");const n=Number(h);return `${n%12||12}:${m} ${n>=12?"PM":"AM"}`};
-  return <>
-    <div className="greeting"><div><p className="eyebrow">Today</p><h1>Good morning, {name}</h1><p>Here’s what needs your attention today.</p></div><button className="primary" onClick={() => onView("Attendance")}><Plus size={18}/> Start a class</button></div>
-    <section className="metrics">
-      <button className="metric featured" onClick={() => onView("Discipline")}><span className="metric-icon"><ClipboardCheck/></span><span><small>Pending actions</small><strong>{pending}</strong></span><ChevronRight/></button>
-      <button className="metric" onClick={() => onView("Attendance")}><span className="metric-icon blue"><Users/></span><span><small>Present marks today</small><strong>{present}<span>/{records.length}</span></strong></span></button>
-      <div className="metric"><span className="metric-icon navy"><GraduationCap/></span><span><small>Recorded grade average</small><strong>{average??"—"}{average!==null&&<span>%</span>}</strong></span></div>
-      <div className="metric"><span className="metric-icon amber"><Clock3/></span><span><small>Late arrivals today</small><strong>{late}</strong></span></div>
-    </section>
-    <section className="dashboard-grid">
-      <div className="card schedule-card"><div className="card-head"><h2>Today’s schedule</h2><button onClick={() => onView("Schedule")}>View all <ChevronRight size={16}/></button></div>
-        {attendance.offerings.length?attendance.offerings.map(o=>{const session=attendance.sessions.find(s=>s.offeringId===o.id);return <div className="schedule-row" key={o.id}><time>{time(o.startTime)}</time><span className="timeline-dot"/><div><b>{o.className}</b><small>{o.subject} · {o.periodName}</small></div><Status>{session?.status==="active"?"In progress":session?.status==="completed"?"Completed":"Upcoming"}</Status></div>}):<div className="empty-state small-empty"><Clock3/><p>No classes scheduled today.</p></div>}
+function Dashboard({
+  onView,
+  name,
+  attendance,
+  discipline,
+  grades,
+  mentoring,
+}: {
+  onView: (v: View) => void;
+  name: string;
+  attendance: AttendanceBundle;
+  discipline: DisciplineBundle;
+  grades: GradesBundle;
+  mentoring: MentoringBundle;
+}) {
+  const records = attendance.sessions.flatMap((s) => s.records);
+  const present = records.filter((r) => r.status === "present").length;
+  const late = records.filter((r) => r.status === "late").length;
+  const absent = records.filter((r) => r.status === "absent").length;
+  const excused = records.filter((r) => r.status === "excused").length;
+  const accountable = present + late + absent;
+  const rate = accountable
+    ? Math.round(((present + late) * 100) / accountable)
+    : 0;
+  const pending = discipline.records.filter(
+    (r) => r.status === "pending",
+  ).length;
+  const average = grades.grades.length
+    ? Math.round(
+        grades.grades.reduce((sum, g) => sum + Number(g.final_score), 0) /
+          grades.grades.length,
+      )
+    : null;
+  const flagged = mentoring.assignments.filter((a) => a.flagged).length;
+  const time = (value: string) => {
+    const [h, m] = value.split(":");
+    const n = Number(h);
+    return `${n % 12 || 12}:${m} ${n >= 12 ? "PM" : "AM"}`;
+  };
+  return (
+    <>
+      <div className="greeting">
+        <div>
+          <p className="eyebrow">Today</p>
+          <h1>Good morning, {name}</h1>
+          <p>Here’s what needs your attention today.</p>
+        </div>
+        <button className="primary" onClick={() => onView("Attendance")}>
+          <Plus size={18} /> Start a class
+        </button>
       </div>
-      <div className="right-stack">
-        <div className="card attendance-card"><div className="card-head"><h2>Attendance snapshot</h2><button onClick={() => onView("Attendance")}>Details <ChevronRight size={16}/></button></div><div className="attendance-body"><div><strong>{rate}%</strong><span>Present or late today</span></div><div className="donut live-donut" style={{background:`conic-gradient(var(--blue) 0 ${rate}%,#e7edf5 ${rate}% 100%)`}} aria-label={`${rate} percent present`}><span>{rate}%</span></div><ul><li><i className="dot present"/>Present <b>{present}</b></li><li><i className="dot late"/>Late <b>{late}</b></li><li><i className="dot absent"/>Absent <b>{absent}</b></li><li><i className="dot excused-dot"/>Excused <b>{excused}</b></li></ul></div></div>
-        <div className="card"><div className="card-head"><h2>Needs attention</h2></div>{[[`${late} late arrivals`,"Attendance"],[`${pending} pending actions`,"Discipline"],[`${flagged} mentor assignments flagged`,"Mentoring"]].map(([t,v])=><button className="attention" key={t} onClick={()=>onView(v as View)}><span className="attention-icon"><Clock3 size={18}/></span><b>{t}</b><ChevronRight size={18}/></button>)}</div>
-      </div>
-    </section>
-  </>;
+      <section className="metrics">
+        <button
+          className="metric featured"
+          onClick={() => onView("Discipline")}
+        >
+          <span className="metric-icon">
+            <ClipboardCheck />
+          </span>
+          <span>
+            <small>Pending actions</small>
+            <strong>{pending}</strong>
+          </span>
+          <ChevronRight />
+        </button>
+        <button className="metric" onClick={() => onView("Attendance")}>
+          <span className="metric-icon blue">
+            <Users />
+          </span>
+          <span>
+            <small>Present marks today</small>
+            <strong>
+              {present}
+              <span>/{records.length}</span>
+            </strong>
+          </span>
+        </button>
+        <div className="metric">
+          <span className="metric-icon navy">
+            <GraduationCap />
+          </span>
+          <span>
+            <small>Recorded grade average</small>
+            <strong>
+              {average ?? "—"}
+              {average !== null && <span>%</span>}
+            </strong>
+          </span>
+        </div>
+        <div className="metric">
+          <span className="metric-icon amber">
+            <Clock3 />
+          </span>
+          <span>
+            <small>Late arrivals today</small>
+            <strong>{late}</strong>
+          </span>
+        </div>
+      </section>
+      <section className="dashboard-grid">
+        <div className="card schedule-card">
+          <div className="card-head">
+            <h2>Today’s schedule</h2>
+            <button onClick={() => onView("Schedule")}>
+              View all <ChevronRight size={16} />
+            </button>
+          </div>
+          {attendance.offerings.length ? (
+            attendance.offerings.map((o) => {
+              const session = attendance.sessions.find(
+                (s) => s.offeringId === o.id,
+              );
+              return (
+                <div className="schedule-row" key={o.id}>
+                  <time>{time(o.startTime)}</time>
+                  <span className="timeline-dot" />
+                  <div>
+                    <b>{o.className}</b>
+                    <small>
+                      {o.subject} · {o.periodName}
+                    </small>
+                  </div>
+                  <Status>
+                    {session?.status === "active"
+                      ? "In progress"
+                      : session?.status === "completed"
+                        ? "Completed"
+                        : "Upcoming"}
+                  </Status>
+                </div>
+              );
+            })
+          ) : (
+            <div className="empty-state small-empty">
+              <Clock3 />
+              <p>No classes scheduled today.</p>
+            </div>
+          )}
+        </div>
+        <div className="right-stack">
+          <div className="card attendance-card">
+            <div className="card-head">
+              <h2>Attendance snapshot</h2>
+              <button onClick={() => onView("Attendance")}>
+                Details <ChevronRight size={16} />
+              </button>
+            </div>
+            <div className="attendance-body">
+              <div>
+                <strong>{rate}%</strong>
+                <span>Present or late today</span>
+              </div>
+              <div
+                className="donut live-donut"
+                style={{
+                  background: `conic-gradient(var(--blue) 0 ${rate}%,#e7edf5 ${rate}% 100%)`,
+                }}
+                aria-label={`${rate} percent present`}
+              >
+                <span>{rate}%</span>
+              </div>
+              <ul>
+                <li>
+                  <i className="dot present" />
+                  Present <b>{present}</b>
+                </li>
+                <li>
+                  <i className="dot late" />
+                  Late <b>{late}</b>
+                </li>
+                <li>
+                  <i className="dot absent" />
+                  Absent <b>{absent}</b>
+                </li>
+                <li>
+                  <i className="dot excused-dot" />
+                  Excused <b>{excused}</b>
+                </li>
+              </ul>
+            </div>
+          </div>
+          <div className="card">
+            <div className="card-head">
+              <h2>Needs attention</h2>
+            </div>
+            {[
+              [`${late} late arrivals`, "Attendance"],
+              [`${pending} pending actions`, "Discipline"],
+              [`${flagged} mentor assignments flagged`, "Mentoring"],
+            ].map(([t, v]) => (
+              <button
+                className="attention"
+                key={t}
+                onClick={() => onView(v as View)}
+              >
+                <span className="attention-icon">
+                  <Clock3 size={18} />
+                </span>
+                <b>{t}</b>
+                <ChevronRight size={18} />
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
+    </>
+  );
 }
 
-function StudentsView({initialStudents,isPrincipal,schoolId,initialQuery=""}:{initialStudents:StudentRow[];isPrincipal:boolean;schoolId?:string;initialQuery?:string}) {
-  const [query,setQuery]=useState(initialQuery);const [yearFilter,setYearFilter]=useState("all");const [all,setAll]=useState(initialStudents);const [adding,setAdding]=useState(false);const [editing,setEditing]=useState<StudentRow|null>(null);const [archiveCandidate,setArchiveCandidate]=useState<StudentRow|null>(null);const [first,setFirst]=useState("");const [last,setLast]=useState("");const [year,setYear]=useState("Shiur Alef");const [error,setError]=useState("");const [busy,setBusy]=useState(false);
-  const rows=all.filter(s=>s.name.toLowerCase().includes(query.toLowerCase())&&(yearFilter==="all"||s.year===yearFilter));const years=[...new Set(all.map(s=>s.year).filter(Boolean))];
-  function openEdit(student:StudentRow){const parts=student.name.split(" ");setEditing(student);setFirst(parts[0]||"");setLast(parts.slice(1).join(" "));setYear(student.year);setAdding(false);setError("")}
-  async function saveStudent(){if(!schoolId||!first.trim()||!last.trim())return;setBusy(true);setError("");if(editing?.id){const {data,error}=await createClient().from("students").update({first_name:first.trim(),last_name:last.trim(),year_level:year}).eq("id",editing.id).select("id,first_name,last_name,year_level").single();if(error){setError(error.message);setBusy(false);return}setAll(all.map(s=>s.id===data.id?{...s,name:`${data.first_name} ${data.last_name}`,year:data.year_level}:s))}else{const {data,error}=await createClient().from("students").insert({school_id:schoolId,first_name:first.trim(),last_name:last.trim(),year_level:year}).select("id,first_name,last_name,year_level").single();if(error){setError(error.message);setBusy(false);return}setAll([...all,{id:data.id,name:`${data.first_name} ${data.last_name}`,year:data.year_level,status:"Not marked",grade:0,mentor:"Not assigned"}])}setFirst("");setLast("");setEditing(null);setAdding(false);setBusy(false)}
-  async function archive(student:StudentRow){if(!student.id)return;setBusy(true);const {error}=await createClient().from("students").update({active:false}).eq("id",student.id);if(error){setError(error.message);setBusy(false);return}setAll(all.filter(s=>s.id!==student.id));setEditing(null);setArchiveCandidate(null);setBusy(false)}
-  return <><div className="page-title"><div><h1>Students</h1><p>{all.length} active bochurim</p></div>{isPrincipal&&<button className="primary" onClick={()=>{setAdding(true);setEditing(null);setFirst("");setLast("")}}><Plus size={18}/>Add student</button>}</div>{archiveCandidate&&<section className="card archive-confirm" role="dialog" aria-label="Archive student"><div><b>Archive {archiveCandidate.name}?</b><small>The student will leave active rosters, but historical records remain intact.</small></div><button className="secondary" onClick={()=>setArchiveCandidate(null)}>Cancel</button><button className="primary danger-button" disabled={busy} onClick={()=>archive(archiveCandidate)}>{busy?"Archiving…":"Archive student"}</button></section>}{(adding||editing)&&<div className="card quick-form"><label>First name<input value={first} onChange={e=>setFirst(e.target.value)}/></label><label>Last name<input value={last} onChange={e=>setLast(e.target.value)}/></label><label>Year<select value={year} onChange={e=>setYear(e.target.value)}><option>Shiur Alef</option><option>Shiur Beis</option><option>Shiur Gimmel</option><option>Shiur Daled</option></select></label><div className="form-actions"><button className="secondary" onClick={()=>{setAdding(false);setEditing(null)}}>Cancel</button><button className="primary" disabled={busy||!first.trim()||!last.trim()} onClick={saveStudent}>{busy?"Saving…":editing?"Save changes":"Save student"}</button></div>{error&&<p className="form-error">{error}</p>}</div>}<div className="toolbar"><div className="searchbox"><Search size={18}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search students…"/></div><select className="filter" value={yearFilter} onChange={e=>setYearFilter(e.target.value)} aria-label="Filter students by year"><option value="all">All years</option>{years.map(y=><option key={y}>{y}</option>)}</select></div><div className="card table-card"><table><thead><tr><th>Student</th><th>Year</th><th>Today</th><th>Current grade</th><th>Mashpia</th><th>Actions</th></tr></thead><tbody>{rows.length?rows.map(s=><tr key={s.id||s.name}><td><div className="person"><span className="avatar small">{s.name.split(" ").map(n=>n[0]).join("")}</span><b>{s.name}</b></div></td><td>{s.year}</td><td><Status>{s.status}</Status></td><td><b>{s.grade?s.grade+"%":"—"}</b></td><td>{s.mentor}</td><td>{isPrincipal?<div className="row-actions"><button className="tiny-primary" onClick={()=>openEdit(s)}>Edit</button><button className="icon-btn text-action" disabled={busy} onClick={()=>setArchiveCandidate(s)}>Archive</button></div>:"—"}</td></tr>):<tr><td colSpan={6}><div className="empty-table"><Users/><b>No matching students</b><span>Adjust the search or year filter.</span></div></td></tr>}</tbody></table></div></>;
+function StudentsView({
+  initialStudents,
+  isPrincipal,
+  schoolId,
+  initialQuery = "",
+}: {
+  initialStudents: StudentRow[];
+  isPrincipal: boolean;
+  schoolId?: string;
+  initialQuery?: string;
+}) {
+  const [query, setQuery] = useState(initialQuery);
+  const [yearFilter, setYearFilter] = useState("all");
+  const [all, setAll] = useState(initialStudents);
+  const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState<StudentRow | null>(null);
+  const [archiveCandidate, setArchiveCandidate] = useState<StudentRow | null>(
+    null,
+  );
+  const [first, setFirst] = useState("");
+  const [last, setLast] = useState("");
+  const [year, setYear] = useState("Shiur Alef");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const rows = all.filter(
+    (s) =>
+      s.name.toLowerCase().includes(query.toLowerCase()) &&
+      (yearFilter === "all" || s.year === yearFilter),
+  );
+  const years = [...new Set(all.map((s) => s.year).filter(Boolean))];
+  function openEdit(student: StudentRow) {
+    const parts = student.name.split(" ");
+    setEditing(student);
+    setFirst(parts[0] || "");
+    setLast(parts.slice(1).join(" "));
+    setYear(student.year);
+    setAdding(false);
+    setError("");
+  }
+  async function saveStudent() {
+    if (!schoolId || !first.trim() || !last.trim()) return;
+    setBusy(true);
+    setError("");
+    if (editing?.id) {
+      const { data, error } = await createClient()
+        .from("students")
+        .update({
+          first_name: first.trim(),
+          last_name: last.trim(),
+          year_level: year,
+        })
+        .eq("id", editing.id)
+        .select("id,first_name,last_name,year_level")
+        .single();
+      if (error) {
+        setError(error.message);
+        setBusy(false);
+        return;
+      }
+      setAll(
+        all.map((s) =>
+          s.id === data.id
+            ? {
+                ...s,
+                name: `${data.first_name} ${data.last_name}`,
+                year: data.year_level,
+              }
+            : s,
+        ),
+      );
+    } else {
+      const { data, error } = await createClient()
+        .from("students")
+        .insert({
+          school_id: schoolId,
+          first_name: first.trim(),
+          last_name: last.trim(),
+          year_level: year,
+        })
+        .select("id,first_name,last_name,year_level")
+        .single();
+      if (error) {
+        setError(error.message);
+        setBusy(false);
+        return;
+      }
+      setAll([
+        ...all,
+        {
+          id: data.id,
+          name: `${data.first_name} ${data.last_name}`,
+          year: data.year_level,
+          status: "Not marked",
+          grade: 0,
+          mentor: "Not assigned",
+        },
+      ]);
+    }
+    setFirst("");
+    setLast("");
+    setEditing(null);
+    setAdding(false);
+    setBusy(false);
+  }
+  async function archive(student: StudentRow) {
+    if (!student.id) return;
+    setBusy(true);
+    const { error } = await createClient()
+      .from("students")
+      .update({ active: false })
+      .eq("id", student.id);
+    if (error) {
+      setError(error.message);
+      setBusy(false);
+      return;
+    }
+    setAll(all.filter((s) => s.id !== student.id));
+    setEditing(null);
+    setArchiveCandidate(null);
+    setBusy(false);
+  }
+  return (
+    <>
+      <div className="page-title">
+        <div>
+          <h1>Students</h1>
+          <p>{all.length} active bochurim</p>
+        </div>
+        {isPrincipal && (
+          <button
+            className="primary"
+            onClick={() => {
+              setAdding(true);
+              setEditing(null);
+              setFirst("");
+              setLast("");
+            }}
+          >
+            <Plus size={18} />
+            Add student
+          </button>
+        )}
+      </div>
+      {archiveCandidate && (
+        <section
+          className="card archive-confirm"
+          role="dialog"
+          aria-label="Archive student"
+        >
+          <div>
+            <b>Archive {archiveCandidate.name}?</b>
+            <small>
+              The student will leave active rosters, but historical records
+              remain intact.
+            </small>
+          </div>
+          <button
+            className="secondary"
+            onClick={() => setArchiveCandidate(null)}
+          >
+            Cancel
+          </button>
+          <button
+            className="primary danger-button"
+            disabled={busy}
+            onClick={() => archive(archiveCandidate)}
+          >
+            {busy ? "Archiving…" : "Archive student"}
+          </button>
+        </section>
+      )}
+      {(adding || editing) && (
+        <div className="card quick-form">
+          <label>
+            First name
+            <input value={first} onChange={(e) => setFirst(e.target.value)} />
+          </label>
+          <label>
+            Last name
+            <input value={last} onChange={(e) => setLast(e.target.value)} />
+          </label>
+          <label>
+            Year
+            <select value={year} onChange={(e) => setYear(e.target.value)}>
+              <option>Shiur Alef</option>
+              <option>Shiur Beis</option>
+              <option>Shiur Gimmel</option>
+              <option>Shiur Daled</option>
+            </select>
+          </label>
+          <div className="form-actions">
+            <button
+              className="secondary"
+              onClick={() => {
+                setAdding(false);
+                setEditing(null);
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              className="primary"
+              disabled={busy || !first.trim() || !last.trim()}
+              onClick={saveStudent}
+            >
+              {busy ? "Saving…" : editing ? "Save changes" : "Save student"}
+            </button>
+          </div>
+          {error && <p className="form-error">{error}</p>}
+        </div>
+      )}
+      <div className="toolbar">
+        <div className="searchbox">
+          <Search size={18} />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search students…"
+          />
+        </div>
+        <select
+          className="filter"
+          value={yearFilter}
+          onChange={(e) => setYearFilter(e.target.value)}
+          aria-label="Filter students by year"
+        >
+          <option value="all">All years</option>
+          {years.map((y) => (
+            <option key={y}>{y}</option>
+          ))}
+        </select>
+      </div>
+      <div className="card table-card">
+        <table>
+          <thead>
+            <tr>
+              <th>Student</th>
+              <th>Year</th>
+              <th>Today</th>
+              <th>Current grade</th>
+              <th>Mashpia</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length ? (
+              rows.map((s) => (
+                <tr key={s.id || s.name}>
+                  <td>
+                    <div className="person">
+                      <span className="avatar small">
+                        {s.name
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("")}
+                      </span>
+                      <b>{s.name}</b>
+                    </div>
+                  </td>
+                  <td>{s.year}</td>
+                  <td>
+                    <Status>{s.status}</Status>
+                  </td>
+                  <td>
+                    <b>{s.grade ? s.grade + "%" : "—"}</b>
+                  </td>
+                  <td>{s.mentor}</td>
+                  <td>
+                    {isPrincipal ? (
+                      <div className="row-actions">
+                        <button
+                          className="tiny-primary"
+                          onClick={() => openEdit(s)}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          className="icon-btn text-action"
+                          disabled={busy}
+                          onClick={() => setArchiveCandidate(s)}
+                        >
+                          Archive
+                        </button>
+                      </div>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={6}>
+                  <div className="empty-table">
+                    <Users />
+                    <b>No matching students</b>
+                    <span>Adjust the search or year filter.</span>
+                  </div>
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
 }
 
-function StaffView(){const [emails,setEmails]=useState("");const [role,setRole]=useState("rebbi");const [links,setLinks]=useState<{email:string;url:string}[]>([]);const [error,setError]=useState("");const [busy,setBusy]=useState(false);const [copied,setCopied]=useState("");async function invite(){const parsed=[...new Set(emails.split(/[\n,]+/).map(e=>e.trim().toLowerCase()).filter(Boolean))];if(!parsed.length){setError("Enter at least one email address.");return}setBusy(true);setError("");const {data,error}=await createClient().rpc("create_staff_invites",{p_emails:parsed,p_roles:[role]});if(error){setError(error.message);setBusy(false);return}setLinks((data||[]).map((row:{email:string;token:string})=>({email:row.email,url:`${location.hostname==="localhost"?"https://hashgacha-app.vercel.app":location.origin}/invite/${row.token}`})));setEmails("");setBusy(false)}return <><PageTitle title="Staff & invitations" subtitle="Invite staff securely with single-use links"/><div className="invite-grid"><div className="card invite-card"><h2>Invite staff</h2><p>Paste one email per line or separate addresses with commas. This batch receives one role.</p><label>Email addresses<textarea value={emails} onChange={e=>setEmails(e.target.value)} placeholder={"rabbi1@yeshiva.org\nrabbi2@yeshiva.org"}/></label><label>Role<select value={role} onChange={e=>setRole(e.target.value)}><option value="rebbi">Rebbi</option><option value="mashpia">Mashpia</option><option value="principal">Principal</option></select></label>{error&&<p className="form-error">{error}</p>}<button className="primary" onClick={invite} disabled={busy}><UserPlus size={18}/>{busy?"Creating links…":"Create invite links"}</button></div><div className="card invite-card links-card"><h2>New invitation links</h2>{links.length===0?<div className="empty-state"><UserPlus/><p>Generated links will appear here, ready to copy into email, WhatsApp, or text.</p></div>:links.map(item=><div className="invite-link" key={item.email}><div><b>{item.email}</b><small>Expires in 7 days · single use</small></div><button onClick={async()=>{await navigator.clipboard.writeText(item.url);setCopied(item.email)}}><Copy/> {copied===item.email?"Copied":"Copy"}</button></div>)}</div></div></>}
+function StaffView({
+  initial,
+  userId,
+}: {
+  initial: StaffData[];
+  userId: string;
+}) {
+  const [emails, setEmails] = useState("");
+  const [role, setRole] = useState("rebbi");
+  const [links, setLinks] = useState<{ email: string; url: string }[]>([]);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState("");
+  const [staff, setStaff] = useState(initial);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [staffName, setStaffName] = useState("");
+  const [staffRole, setStaffRole] = useState("rebbi");
+  function beginStaff(row: StaffData) {
+    setEditing(row.id);
+    setStaffName(row.name);
+    setStaffRole(row.roles[0] || "rebbi");
+  }
+  async function saveStaff() {
+    if (!editing) return;
+    const { data, error } = await createClient()
+      .from("staff")
+      .update({ name: staffName.trim(), roles: [staffRole] })
+      .eq("id", editing)
+      .select("id,name,roles")
+      .single();
+    if (error) {
+      setError(error.message);
+      return;
+    }
+    setStaff(staff.map((s) => (s.id === data.id ? data : s)));
+    setEditing(null);
+  }
+  async function deactivate(id: string) {
+    const { error } = await createClient()
+      .from("staff")
+      .update({ active: false })
+      .eq("id", id);
+    if (error) {
+      setError(error.message);
+      return;
+    }
+    setStaff(staff.filter((s) => s.id !== id));
+    if (editing === id) setEditing(null);
+  }
+  async function invite() {
+    const parsed = [
+      ...new Set(
+        emails
+          .split(/[\n,]+/)
+          .map((e) => e.trim().toLowerCase())
+          .filter(Boolean),
+      ),
+    ];
+    if (!parsed.length) {
+      setError("Enter at least one email address.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    const { data, error } = await createClient().rpc("create_staff_invites", {
+      p_emails: parsed,
+      p_roles: [role],
+    });
+    if (error) {
+      setError(error.message);
+      setBusy(false);
+      return;
+    }
+    setLinks(
+      (data || []).map((row: { email: string; token: string }) => ({
+        email: row.email,
+        url: `${location.hostname === "localhost" ? "https://hashgacha-app.vercel.app" : location.origin}/invite/${row.token}`,
+      })),
+    );
+    setEmails("");
+    setBusy(false);
+  }
+  return (
+    <>
+      <PageTitle
+        title="Staff & invitations"
+        subtitle="Invite staff securely with single-use links"
+      />
+      <div className="invite-grid">
+        <div className="card invite-card">
+          <h2>Invite staff</h2>
+          <p>
+            Paste one email per line or separate addresses with commas. This
+            batch receives one role.
+          </p>
+          <label>
+            Email addresses
+            <textarea
+              value={emails}
+              onChange={(e) => setEmails(e.target.value)}
+              placeholder={"rabbi1@yeshiva.org\nrabbi2@yeshiva.org"}
+            />
+          </label>
+          <label>
+            Role
+            <select value={role} onChange={(e) => setRole(e.target.value)}>
+              <option value="rebbi">Rebbi</option>
+              <option value="mashpia">Mashpia</option>
+              <option value="principal">Principal</option>
+            </select>
+          </label>
+          {error && <p className="form-error">{error}</p>}
+          <button className="primary" onClick={invite} disabled={busy}>
+            <UserPlus size={18} />
+            {busy ? "Creating links…" : "Create invite links"}
+          </button>
+        </div>
+        <div className="card invite-card links-card">
+          <h2>New invitation links</h2>
+          {links.length === 0 ? (
+            <div className="empty-state">
+              <UserPlus />
+              <p>
+                Generated links will appear here, ready to copy into email,
+                WhatsApp, or text.
+              </p>
+            </div>
+          ) : (
+            links.map((item) => (
+              <div className="invite-link" key={item.email}>
+                <div>
+                  <b>{item.email}</b>
+                  <small>Expires in 7 days · single use</small>
+                </div>
+                <button
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(item.url);
+                    setCopied(item.email);
+                  }}
+                >
+                  <Copy /> {copied === item.email ? "Copied" : "Copy"}
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+      {editing && (
+        <section className="card staff-editor">
+          <label>
+            Name
+            <input
+              value={staffName}
+              onChange={(e) => setStaffName(e.target.value)}
+            />
+          </label>
+          <label>
+            Role
+            <select
+              value={staffRole}
+              onChange={(e) => setStaffRole(e.target.value)}
+            >
+              <option value="rebbi">Rebbi</option>
+              <option value="mashpia">Mashpia</option>
+              <option value="principal">Principal</option>
+            </select>
+          </label>
+          <button className="secondary" onClick={() => setEditing(null)}>
+            Cancel
+          </button>
+          <button
+            className="primary"
+            disabled={!staffName.trim()}
+            onClick={saveStaff}
+          >
+            Save staff member
+          </button>
+        </section>
+      )}
+      <div className="card table-card">
+        <table>
+          <thead>
+            <tr>
+              <th>Staff member</th>
+              <th>Role</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {staff.map((s) => (
+              <tr key={s.id}>
+                <td>
+                  <b>{s.name}</b>
+                </td>
+                <td>{s.roles.join(", ")}</td>
+                <td>
+                  <div className="row-actions">
+                    <button
+                      className="tiny-primary"
+                      onClick={() => beginStaff(s)}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      className="icon-btn danger"
+                      disabled={s.id === userId}
+                      onClick={() => deactivate(s.id)}
+                    >
+                      {s.id === userId ? "Current user" : "Deactivate"}
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+}
 
-function GenericView({view}:{view:View}){const content:Record<string,[string,string,string[]]>={Grades:["Grades & testing","Manage assessments, marks, and the automatic point bank",["Upcoming tests","Recent results","Point bank activity"]],Schedule:["Schedule builder","Recurring blocks and today’s operational schedule",["Weekly template","Today’s schedule","PDF schedule rules"]],Mentoring:["Mashpia dashboard","Keep every bochur connected and supported",["Needs attention","Recent conversations","Note requests"]],Reports:["Reports & stats","Cross-module insights and official report cards",["Student hub","Report cards","Data exports"]]};const [title,sub,cards]=content[view];return <><PageTitle title={title} subtitle={`${sub}. Sign in to use this workspace.`}/><div className="feature-grid">{cards.map((c,i)=><div className="card feature-card" key={c}><span className="feature-icon">{i===0?<Sparkles/>:i===1?<FileBarChart/>:<CalendarDays/>}</span><h3>{c}</h3><p>{i===0?"Priority items and the latest activity are collected here.":"Available to authorized staff after sign-in."}</p></div>)}</div></>}
+function GenericView({ view }: { view: View }) {
+  const content: Record<string, [string, string, string[]]> = {
+    Grades: [
+      "Grades & testing",
+      "Manage assessments, marks, and the automatic point bank",
+      ["Upcoming tests", "Recent results", "Point bank activity"],
+    ],
+    Schedule: [
+      "Schedule builder",
+      "Recurring blocks and today’s operational schedule",
+      ["Weekly template", "Today’s schedule", "PDF schedule rules"],
+    ],
+    Mentoring: [
+      "Mashpia dashboard",
+      "Keep every bochur connected and supported",
+      ["Needs attention", "Recent conversations", "Note requests"],
+    ],
+    Reports: [
+      "Reports & stats",
+      "Cross-module insights and official report cards",
+      ["Student hub", "Report cards", "Data exports"],
+    ],
+  };
+  const [title, sub, cards] = content[view];
+  return (
+    <>
+      <PageTitle
+        title={title}
+        subtitle={`${sub}. Sign in to use this workspace.`}
+      />
+      <div className="feature-grid">
+        {cards.map((c, i) => (
+          <div className="card feature-card" key={c}>
+            <span className="feature-icon">
+              {i === 0 ? (
+                <Sparkles />
+              ) : i === 1 ? (
+                <FileBarChart />
+              ) : (
+                <CalendarDays />
+              )}
+            </span>
+            <h3>{c}</h3>
+            <p>
+              {i === 0
+                ? "Priority items and the latest activity are collected here."
+                : "Available to authorized staff after sign-in."}
+            </p>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
 
-function PageTitle({title,subtitle}:{title:string;subtitle:string}){return <div className="page-title"><div><h1>{title}</h1><p>{subtitle}</p></div></div>}
+function PageTitle({ title, subtitle }: { title: string; subtitle: string }) {
+  return (
+    <div className="page-title">
+      <div>
+        <h1>{title}</h1>
+        <p>{subtitle}</p>
+      </div>
+    </div>
+  );
+}
 
-export type SetupBundle={periods:PeriodData[];classes:ClassData[];staff:StaffData[];offerings:OfferingData[];students:SetupStudentData[];assignments:AssignmentData[]};
+export type SetupBundle = {
+  periods: PeriodData[];
+  classes: ClassData[];
+  staff: StaffData[];
+  offerings: OfferingData[];
+  students: SetupStudentData[];
+  assignments: AssignmentData[];
+};
 
-export function AppShell({profileName="Rabbi Cohen",roles=["principal"],schoolId,userId,initialStudents=students,setupData={periods:[],classes:[],staff:[],offerings:[],students:[],assignments:[]},attendanceData={students:[],offerings:[],sessions:[]},disciplineData={types:[],records:[],students:[],snoozeDays:1,snoozeCap:3},gradesData={zmanim:[],offerings:[],tests:[],grades:[],banks:[],transfers:[],students:[]},scheduleData={templates:[],blocks:[],instances:[]},mentoringData={assignments:[],conversations:[],noteRequests:[],statsRequests:[],students:[],mentors:[]},reportsData={students:[],zmanim:[],sessions:[],attendance:[],tests:[],grades:[],discipline:[],conversations:[],reportCards:[]},chatData={staff:[],messages:[]},adminData={schoolName:"",settings:{},staff:[],audit:[],students:[],grades:[],attendance:[],discipline:[]}}:{profileName?:string;roles?:string[];schoolId?:string;userId?:string;initialStudents?:StudentRow[];setupData?:SetupBundle;attendanceData?:AttendanceBundle;disciplineData?:DisciplineBundle;gradesData?:GradesBundle;scheduleData?:ScheduleBundle;mentoringData?:MentoringBundle;reportsData?:ReportsBundle;chatData?:ChatBundle;adminData?:AdminBundle}){const [view,setView]=useState<View>("Dashboard");const [globalQuery,setGlobalQuery]=useState("");const [rtl,setRtl]=useState(false);const [mobile,setMobile]=useState(false);const isPrincipal=roles.includes("principal");const isMashpia=roles.includes("mashpia");const notificationCount=isMashpia?mentoringData.assignments.filter(a=>a.flagged).length+mentoringData.noteRequests.filter(r=>r.status==="pending").length:disciplineData.records.filter(r=>r.status==="pending").length;const allowed=nav.filter(item=>!schoolId?["Dashboard","Students","Grades","Schedule","Mentoring","Reports"].includes(item.label):(item.label!=="Setup"||!!schoolId)&&(isPrincipal||(isMashpia?["Dashboard","Students","Mentoring","Reports","Messages"].includes(item.label):item.label!=="Staff")));const content=view==="Dashboard"?<Dashboard onView={setView} name={profileName} attendance={attendanceData} discipline={disciplineData} grades={gradesData} mentoring={mentoringData}/>:view==="Students"?<StudentsView key={globalQuery} initialStudents={initialStudents} isPrincipal={isPrincipal} schoolId={schoolId} initialQuery={globalQuery}/>:view==="Attendance"&&schoolId&&userId?<AttendanceView schoolId={schoolId} userId={userId} initial={attendanceData}/>:view==="Discipline"&&schoolId&&userId?<DisciplineView schoolId={schoolId} userId={userId} isPrincipal={isPrincipal} initial={disciplineData}/>:view==="Grades"&&schoolId&&userId?<GradesView schoolId={schoolId} userId={userId} isPrincipal={isPrincipal} initial={gradesData}/>:view==="Schedule"&&schoolId&&userId?<ScheduleView schoolId={schoolId} userId={userId} isPrincipal={isPrincipal} initial={scheduleData}/>:view==="Mentoring"&&schoolId&&userId?<MentoringView schoolId={schoolId} userId={userId} isPrincipal={isPrincipal} isMashpia={isMashpia} initial={mentoringData}/>:view==="Reports"&&schoolId&&userId?<ReportsView schoolId={schoolId} userId={userId} isPrincipal={isPrincipal} initial={reportsData}/>:view==="Messages"&&schoolId&&userId?<ChatView schoolId={schoolId} userId={userId} initial={chatData}/>:view==="Admin"&&schoolId?<AdminView schoolId={schoolId} initial={adminData}/>:view==="Staff"?<StaffView/>:view==="Setup"&&schoolId&&userId?<SetupView schoolId={schoolId} userId={userId} isPrincipal={isPrincipal} {...setupData}/>:<GenericView view={view}/>;async function signOut(){await createClient().auth.signOut();location.href="/login"}return <div className="app" dir={rtl?"rtl":"ltr"}><aside className={mobile?"sidebar open":"sidebar"}><div className="side-top"><Logo/><button className="close-mobile" onClick={()=>setMobile(false)}><X/></button></div><nav>{allowed.map(({label,icon:Icon})=><button key={label} className={view===label?"active":""} onClick={()=>{setView(label);setMobile(false)}}><Icon/><span>{label}</span>{label==="Discipline"&&disciplineData.records.filter(r=>r.status==="pending").length>0&&<em>{disciplineData.records.filter(r=>r.status==="pending").length}</em>}</button>)}</nav><div className="side-bottom">{isPrincipal&&<button onClick={()=>{setView("Admin");setMobile(false)}}><Settings/><span>Settings & data</span></button>}<button onClick={signOut}><LogOut/><span>Sign out</span></button></div></aside>{mobile&&<button className="backdrop" onClick={()=>setMobile(false)} aria-label="Close menu"/>}<div className="shell"><header><button className="menu-btn" onClick={()=>setMobile(true)}><Menu/></button><div className="mobile-logo"><Logo/></div><div className="header-search"><Search/><input value={globalQuery} onChange={e=>setGlobalQuery(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")setView("Students")}} placeholder="Search students…" aria-label="Search students"/></div><div className="header-actions"><button className="lang" onClick={()=>setRtl(!rtl)} aria-label="Toggle layout direction"><Languages/><span>{rtl?"LTR":"RTL"}</span></button><button className="bell" onClick={()=>setView(isMashpia?"Mentoring":"Discipline")} aria-label="Open items needing attention"><Bell/>{notificationCount>0&&<i>{notificationCount}</i>}</button><div className="profile"><span className="avatar">{profileName.split(" ").map(n=>n[0]).slice(0,2).join("")}</span><div><b>{profileName}</b><small>{roles.map(r=>r[0].toUpperCase()+r.slice(1)).join(" · ")}</small></div></div></div></header><main>{content}</main></div></div>}
+export function AppShell({
+  profileName = "Rabbi Cohen",
+  roles = ["principal"],
+  schoolId,
+  userId,
+  initialStudents = students,
+  setupData = {
+    periods: [],
+    classes: [],
+    staff: [],
+    offerings: [],
+    students: [],
+    assignments: [],
+  },
+  attendanceData = { students: [], offerings: [], sessions: [] },
+  disciplineData = {
+    types: [],
+    records: [],
+    students: [],
+    snoozeDays: 1,
+    snoozeCap: 3,
+  },
+  gradesData = {
+    zmanim: [],
+    offerings: [],
+    tests: [],
+    grades: [],
+    banks: [],
+    transfers: [],
+    students: [],
+  },
+  scheduleData = { templates: [], blocks: [], instances: [] },
+  mentoringData = {
+    assignments: [],
+    conversations: [],
+    noteRequests: [],
+    statsRequests: [],
+    students: [],
+    mentors: [],
+  },
+  reportsData = {
+    students: [],
+    zmanim: [],
+    sessions: [],
+    attendance: [],
+    tests: [],
+    grades: [],
+    discipline: [],
+    conversations: [],
+    reportCards: [],
+  },
+  chatData = { staff: [], messages: [] },
+  adminData = {
+    schoolName: "",
+    settings: {},
+    staff: [],
+    audit: [],
+    students: [],
+    grades: [],
+    attendance: [],
+    discipline: [],
+  },
+}: {
+  profileName?: string;
+  roles?: string[];
+  schoolId?: string;
+  userId?: string;
+  initialStudents?: StudentRow[];
+  setupData?: SetupBundle;
+  attendanceData?: AttendanceBundle;
+  disciplineData?: DisciplineBundle;
+  gradesData?: GradesBundle;
+  scheduleData?: ScheduleBundle;
+  mentoringData?: MentoringBundle;
+  reportsData?: ReportsBundle;
+  chatData?: ChatBundle;
+  adminData?: AdminBundle;
+}) {
+  const [view, setView] = useState<View>("Dashboard");
+  const [globalQuery, setGlobalQuery] = useState("");
+  const [rtl, setRtl] = useState(false);
+  const [mobile, setMobile] = useState(false);
+  const isPrincipal = roles.includes("principal");
+  const isMashpia = roles.includes("mashpia");
+  const notificationCount = isMashpia
+    ? mentoringData.assignments.filter((a) => a.flagged).length +
+      mentoringData.noteRequests.filter((r) => r.status === "pending").length
+    : disciplineData.records.filter((r) => r.status === "pending").length;
+  const allowed = nav.filter((item) =>
+    !schoolId
+      ? [
+          "Dashboard",
+          "Students",
+          "Grades",
+          "Schedule",
+          "Mentoring",
+          "Reports",
+        ].includes(item.label)
+      : (item.label !== "Setup" || !!schoolId) &&
+        (isPrincipal ||
+          (isMashpia
+            ? [
+                "Dashboard",
+                "Students",
+                "Mentoring",
+                "Reports",
+                "Messages",
+              ].includes(item.label)
+            : item.label !== "Staff")),
+  );
+  const content =
+    view === "Dashboard" ? (
+      <Dashboard
+        onView={setView}
+        name={profileName}
+        attendance={attendanceData}
+        discipline={disciplineData}
+        grades={gradesData}
+        mentoring={mentoringData}
+      />
+    ) : view === "Students" ? (
+      <StudentsView
+        key={globalQuery}
+        initialStudents={initialStudents}
+        isPrincipal={isPrincipal}
+        schoolId={schoolId}
+        initialQuery={globalQuery}
+      />
+    ) : view === "Attendance" && schoolId && userId ? (
+      <AttendanceView
+        schoolId={schoolId}
+        userId={userId}
+        initial={attendanceData}
+      />
+    ) : view === "Discipline" && schoolId && userId ? (
+      <DisciplineView
+        schoolId={schoolId}
+        userId={userId}
+        isPrincipal={isPrincipal}
+        initial={disciplineData}
+      />
+    ) : view === "Grades" && schoolId && userId ? (
+      <GradesView
+        schoolId={schoolId}
+        userId={userId}
+        isPrincipal={isPrincipal}
+        initial={gradesData}
+      />
+    ) : view === "Schedule" && schoolId && userId ? (
+      <ScheduleView
+        schoolId={schoolId}
+        userId={userId}
+        isPrincipal={isPrincipal}
+        initial={scheduleData}
+      />
+    ) : view === "Mentoring" && schoolId && userId ? (
+      <MentoringView
+        schoolId={schoolId}
+        userId={userId}
+        isPrincipal={isPrincipal}
+        isMashpia={isMashpia}
+        initial={mentoringData}
+      />
+    ) : view === "Reports" && schoolId && userId ? (
+      <ReportsView
+        schoolId={schoolId}
+        userId={userId}
+        isPrincipal={isPrincipal}
+        initial={reportsData}
+      />
+    ) : view === "Messages" && schoolId && userId ? (
+      <ChatView schoolId={schoolId} userId={userId} initial={chatData} />
+    ) : view === "Admin" && schoolId ? (
+      <AdminView schoolId={schoolId} initial={adminData} />
+    ) : view === "Staff" && userId ? (
+      <StaffView initial={setupData.staff} userId={userId} />
+    ) : view === "Setup" && schoolId && userId ? (
+      <SetupView
+        schoolId={schoolId}
+        userId={userId}
+        isPrincipal={isPrincipal}
+        {...setupData}
+      />
+    ) : (
+      <GenericView view={view} />
+    );
+  async function signOut() {
+    await createClient().auth.signOut();
+    location.href = "/login";
+  }
+  return (
+    <div className="app" dir={rtl ? "rtl" : "ltr"}>
+      <aside className={mobile ? "sidebar open" : "sidebar"}>
+        <div className="side-top">
+          <Logo />
+          <button className="close-mobile" onClick={() => setMobile(false)}>
+            <X />
+          </button>
+        </div>
+        <nav>
+          {allowed.map(({ label, icon: Icon }) => (
+            <button
+              key={label}
+              className={view === label ? "active" : ""}
+              onClick={() => {
+                setView(label);
+                setMobile(false);
+              }}
+            >
+              <Icon />
+              <span>{label}</span>
+              {label === "Discipline" &&
+                disciplineData.records.filter((r) => r.status === "pending")
+                  .length > 0 && (
+                  <em>
+                    {
+                      disciplineData.records.filter(
+                        (r) => r.status === "pending",
+                      ).length
+                    }
+                  </em>
+                )}
+            </button>
+          ))}
+        </nav>
+        <div className="side-bottom">
+          {isPrincipal && (
+            <button
+              onClick={() => {
+                setView("Admin");
+                setMobile(false);
+              }}
+            >
+              <Settings />
+              <span>Settings & data</span>
+            </button>
+          )}
+          <button onClick={signOut}>
+            <LogOut />
+            <span>Sign out</span>
+          </button>
+        </div>
+      </aside>
+      {mobile && (
+        <button
+          className="backdrop"
+          onClick={() => setMobile(false)}
+          aria-label="Close menu"
+        />
+      )}
+      <div className="shell">
+        <header>
+          <button className="menu-btn" onClick={() => setMobile(true)}>
+            <Menu />
+          </button>
+          <div className="mobile-logo">
+            <Logo />
+          </div>
+          <div className="header-search">
+            <Search />
+            <input
+              value={globalQuery}
+              onChange={(e) => setGlobalQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") setView("Students");
+              }}
+              placeholder="Search students…"
+              aria-label="Search students"
+            />
+          </div>
+          <div className="header-actions">
+            <button
+              className="lang"
+              onClick={() => setRtl(!rtl)}
+              aria-label="Toggle layout direction"
+            >
+              <Languages />
+              <span>{rtl ? "LTR" : "RTL"}</span>
+            </button>
+            <button
+              className="bell"
+              onClick={() => setView(isMashpia ? "Mentoring" : "Discipline")}
+              aria-label="Open items needing attention"
+            >
+              <Bell />
+              {notificationCount > 0 && <i>{notificationCount}</i>}
+            </button>
+            <div className="profile">
+              <span className="avatar">
+                {profileName
+                  .split(" ")
+                  .map((n) => n[0])
+                  .slice(0, 2)
+                  .join("")}
+              </span>
+              <div>
+                <b>{profileName}</b>
+                <small>
+                  {roles
+                    .map((r) => r[0].toUpperCase() + r.slice(1))
+                    .join(" · ")}
+                </small>
+              </div>
+            </div>
+          </div>
+        </header>
+        <main>{content}</main>
+      </div>
+    </div>
+  );
+}
 
-export default function HomePage(){return <AppShell/>}
+export default function HomePage() {
+  return <AppShell />;
+}
