@@ -34,6 +34,7 @@ export default async function ProtectedApp() {
     offeringResult,
     assignmentResult,
     sessionResult,
+    excusalResult,
     typeResult,
     disciplineResult,
     schoolResult,
@@ -85,6 +86,11 @@ export default async function ProtectedApp() {
       .from("attendance_sessions")
       .select("id,class_offering_id,status,actual_start_time")
       .eq("session_date", today),
+    supabase
+      .from("excusal_records")
+      .select("id,student_id,scope,class_offering_id,start_date,end_date,reason,active")
+      .eq("active", true)
+      .order("start_date", { ascending: false }),
     supabase
       .from("punishment_types")
       .select(
@@ -243,6 +249,7 @@ export default async function ProtectedApp() {
           lateMinutes: r.late_minutes,
         })),
     })),
+    excusals: (excusalResult.data || []) as AttendanceBundle["excusals"],
   };
   const settings = (schoolResult.data?.settings || {}) as {
     snooze_days?: number;
