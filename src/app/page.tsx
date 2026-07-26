@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import {
   Bell,
   BookOpen,
   CalendarDays,
+  ChevronDown,
   ChevronRight,
   ClipboardCheck,
   Clock3,
@@ -64,7 +65,7 @@ type View =
   | "Setup"
   | "Admin";
 
-const navGroups: { title: string; items: { label: View; icon: typeof Home }[] }[] = [
+const navGroups: { title: string; items: { label: View; name?: string; icon: typeof Home }[] }[] = [
   {
     title: "Daily work",
     items: [
@@ -85,7 +86,7 @@ const navGroups: { title: string; items: { label: View; icon: typeof Home }[] }[
   {
     title: "Academics",
     items: [
-      { label: "Grades", icon: GraduationCap },
+      { label: "Grades", name: "Gradebook", icon: GraduationCap },
       { label: "Reports", icon: FileBarChart },
     ],
   },
@@ -94,6 +95,7 @@ const navGroups: { title: string; items: { label: View; icon: typeof Home }[] }[
     items: [
       { label: "Staff", icon: UserPlus },
       { label: "Setup", icon: Settings },
+      { label: "Admin", name: "Settings & data", icon: Settings },
     ],
   },
 ];
@@ -568,11 +570,11 @@ function StudentsView({
         </section>
         </div>
       )}
-      {(adding || editing) && (
+      {adding && (
         <div className="drawer-layer" role="presentation">
-        <button className="drawer-backdrop" aria-label="Close student editor" onClick={() => { setAdding(false); setEditing(null); }} />
-        <aside className="drawer" role="dialog" aria-modal="true" aria-label={editing ? "Edit student" : "Add student"}>
-          <div className="drawer-head"><div><span className="eyebrow">Student record</span><h2>{editing ? "Edit student" : "Add a student"}</h2><p>Keep the core profile concise. Class and mentoring assignments are managed from their own workspaces.</p></div><button className="icon-action" onClick={() => { setAdding(false); setEditing(null); }} aria-label="Close"><X /></button></div>
+        <button className="drawer-backdrop" aria-label="Close student editor" onClick={() => setAdding(false)} />
+        <aside className="drawer" role="dialog" aria-modal="true" aria-label="Add student">
+          <div className="drawer-head"><div><span className="eyebrow">Student record</span><h2>Add a student</h2><p>Keep the core profile concise. Class and mentoring assignments are managed from their own workspaces.</p></div><button className="icon-action" onClick={() => setAdding(false)} aria-label="Close"><X /></button></div>
         <div className="drawer-body quick-form">
           <label>
             First name
@@ -596,7 +598,6 @@ function StudentsView({
               className="secondary"
               onClick={() => {
                 setAdding(false);
-                setEditing(null);
               }}
             >
               Cancel
@@ -606,7 +607,7 @@ function StudentsView({
               disabled={busy || !first.trim() || !last.trim()}
               onClick={saveStudent}
             >
-              {busy ? "Saving…" : editing ? "Save changes" : "Save student"}
+              {busy ? "Saving…" : "Save student"}
             </button>
           </div>
           {error && <p className="form-error">{error}</p>}
@@ -650,7 +651,8 @@ function StudentsView({
           <tbody>
             {rows.length ? (
               rows.map((s) => (
-                <tr key={s.id || s.name}>
+                <Fragment key={s.id || s.name}>
+                <tr>
                   <td>
                     <div className="person">
                       <span className="avatar small">
@@ -692,6 +694,26 @@ function StudentsView({
                     )}
                   </td>
                 </tr>
+                {editing === s && (
+                  <tr className="student-context-row">
+                    <td colSpan={6}>
+                      <section className="student-inline-editor" aria-label={`Edit ${s.name}`}>
+                        <div className="inline-editor-head">
+                          <div><span className="eyebrow">Editing student</span><h3>{s.name}</h3></div>
+                          <button className="icon-action" onClick={() => setEditing(null)} aria-label={`Close editor for ${s.name}`}><X /></button>
+                        </div>
+                        <div className="inline-editor-fields">
+                          <label>First name<input value={first} onChange={(e) => setFirst(e.target.value)} /></label>
+                          <label>Last name<input value={last} onChange={(e) => setLast(e.target.value)} /></label>
+                          <label>Year<select value={year} onChange={(e) => setYear(e.target.value)}><option>Shiur Alef</option><option>Shiur Beis</option><option>Shiur Gimmel</option><option>Shiur Daled</option></select></label>
+                        </div>
+                        {error && <p className="form-error">{error}</p>}
+                        <div className="inline-editor-actions"><button className="secondary" onClick={() => setEditing(null)}>Cancel</button><button className="primary" disabled={busy || !first.trim() || !last.trim()} onClick={saveStudent}>{busy ? "Saving…" : "Save changes"}</button></div>
+                      </section>
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
               ))
             ) : (
               <tr>
@@ -1175,6 +1197,7 @@ export function AppShell({
   const [globalQuery, setGlobalQuery] = useState("");
   const [rtl, setRtl] = useState(false);
   const [mobile, setMobile] = useState(false);
+  const [administrationOpen, setAdministrationOpen] = useState(false);
   const isPrincipal = roles.includes("principal");
   const isMashpia = roles.includes("mashpia");
   const notificationCount = isMashpia
@@ -1192,6 +1215,7 @@ export function AppShell({
           "Reports",
         ].includes(label)
       : (label !== "Setup" || !!schoolId) &&
+        (label !== "Admin" || isPrincipal) &&
         (isPrincipal ||
           (isMashpia
             ? [
@@ -1297,20 +1321,27 @@ export function AppShell({
           </button>
         </div>
         <nav aria-label="Primary navigation">
-          {allowedGroups.map((group) => (
+          {allowedGroups.map((group) => {
+            const isAdministration = group.title === "Administration";
+            const groupActive = group.items.some((item) => item.label === view);
+            return (
             <div className="nav-group" key={group.title}>
-              <span className="nav-group-label">{group.title}</span>
-              {group.items.map(({ label, icon: Icon }) => (
+              {isAdministration ? (
+                <button className={`nav-group-toggle ${groupActive ? "active" : ""}`} aria-expanded={administrationOpen || groupActive} onClick={() => setAdministrationOpen((open) => !open)}>
+                  <Settings /><span>Administration</span><ChevronDown className="nav-chevron" />
+                </button>
+              ) : <span className="nav-group-label">{group.title}</span>}
+              {(!isAdministration || administrationOpen || groupActive) && group.items.map(({ label, name, icon: Icon }) => (
             <button
               key={label}
-              className={view === label ? "active" : ""}
+              className={`${view === label ? "active" : ""}${isAdministration ? " nav-subitem" : ""}`}
               onClick={() => {
                 setView(label);
                 setMobile(false);
               }}
             >
               <Icon />
-              <span>{label}</span>
+              <span>{name || label}</span>
               {label === "Discipline" &&
                 disciplineData.records.filter((r) => r.status === "pending")
                   .length > 0 && (
@@ -1325,20 +1356,10 @@ export function AppShell({
             </button>
               ))}
             </div>
-          ))}
+            );
+          })}
         </nav>
         <div className="side-bottom">
-          {isPrincipal && (
-            <button
-              onClick={() => {
-                setView("Admin");
-                setMobile(false);
-              }}
-            >
-              <Settings />
-              <span>Settings & data</span>
-            </button>
-          )}
           <button onClick={signOut}>
             <LogOut />
             <span>Sign out</span>
