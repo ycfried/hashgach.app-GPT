@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Check, ChevronRight, Clock3, Pencil, Plus, ShieldCheck, Trash2, Users, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Check, ChevronDown, ChevronRight, Clock3, Pencil, Plus, ShieldCheck, Trash2, Users, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 export type AttendanceStudent = { id: string; name: string };
@@ -15,6 +15,13 @@ const options = ["present", "late", "absent", "excused"] as const;
 const labels = { present: "Present", late: "Late", absent: "Absent", excused: "Excused" };
 const today = () => new Date().toISOString().slice(0, 10);
 const time = (value: string) => { const [h, m] = value.split(":"); const n = Number(h); return `${n % 12 || 12}:${m} ${n >= 12 ? "PM" : "AM"}`; };
+const lateMinutesNow = (scheduledStart: string) => {
+  const [hours, minutes] = scheduledStart.split(":").map(Number);
+  const now = new Date();
+  const start = new Date(now);
+  start.setHours(hours, minutes, 0, 0);
+  return now <= start ? 0 : Math.ceil((now.getTime() - start.getTime()) / 60_000);
+};
 
 export default function AttendanceView({ schoolId, userId, isPrincipal, initial }: { schoolId: string; userId: string; isPrincipal: boolean; initial: AttendanceBundle }) {
   const [sessions, setSessions] = useState(initial.sessions);
@@ -25,9 +32,16 @@ export default function AttendanceView({ schoolId, userId, isPrincipal, initial 
   const [busy, setBusy] = useState(false);
   const [lateTarget, setLateTarget] = useState<string | null>(null);
   const [lateValue, setLateValue] = useState("5");
+  const [savingStudent, setSavingStudent] = useState<string | null>(null);
+  const arrivalTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const offering = initial.offerings.find((o) => o.id === selected);
   const session = sessions.find((s) => s.offeringId === selected);
   const roster = offering ? initial.students.filter((s) => offering.studentIds.includes(s.id)) : [];
+
+  useEffect(() => {
+    const timers = arrivalTimers.current;
+    return () => timers.forEach(clearTimeout);
+  }, []);
 
   function applicableExcusal(studentId: string, offeringId: string) {
     const date = today();
@@ -56,18 +70,38 @@ export default function AttendanceView({ schoolId, userId, isPrincipal, initial 
   async function persistMark(studentId: string, status: (typeof options)[number], lateMinutes: number | null = null) {
     if (!session) return;
     setError("");
+    setSavingStudent(studentId);
     const payload = { school_id: schoolId, attendance_session_id: session.id, student_id: studentId, status, late_minutes: lateMinutes, updated_by: userId };
     const { data, error } = await createClient().from("attendance_records").upsert(payload, { onConflict: "attendance_session_id,student_id" }).select("id,student_id,status,late_minutes").single();
-    if (error) { setError(error.message); return; }
-    setSessions(sessions.map((s) => s.id === session.id ? { ...s, records: [...s.records.filter((r) => r.studentId !== studentId), { id: data.id, studentId: data.student_id, status: data.status, lateMinutes: data.late_minutes }] } : s));
+    if (error) { setError(error.message); setSavingStudent(null); return; }
+    setSessions((current) => current.map((s) => s.id === session.id ? { ...s, records: [...s.records.filter((r) => r.studentId !== studentId), { id: data.id, studentId: data.student_id, status: data.status, lateMinutes: data.late_minutes }] } : s));
     setLateTarget(null);
+    setSavingStudent(null);
   }
   function mark(studentId: string, status: (typeof options)[number]) { if (status === "late") { setLateTarget(studentId); setLateValue(String(session?.records.find((r) => r.studentId === studentId)?.lateMinutes || 5)); return; } void persistMark(studentId, status); }
+  function checkIn(studentId: string) {
+    if (savingStudent === studentId) return;
+    const pending = arrivalTimers.current.get(studentId);
+    if (pending) clearTimeout(pending);
+    const timer = setTimeout(() => {
+      arrivalTimers.current.delete(studentId);
+      void persistMark(studentId, "present");
+    }, 260);
+    arrivalTimers.current.set(studentId, timer);
+  }
+  function checkInNow(studentId: string) {
+    const timer = arrivalTimers.current.get(studentId);
+    if (timer) clearTimeout(timer);
+    arrivalTimers.current.delete(studentId);
+    if (!offering) return;
+    const minutes = lateMinutesNow(offering.startTime);
+    void persistMark(studentId, minutes > 0 ? "late" : "present", minutes > 0 ? minutes : null);
+  }
   async function markAll() { if (!session || !roster.length) return; setBusy(true); const payload = roster.map((student) => ({ school_id: schoolId, attendance_session_id: session.id, student_id: student.id, status: "present" as const, late_minutes: null, updated_by: userId })); const { data, error } = await createClient().from("attendance_records").upsert(payload, { onConflict: "attendance_session_id,student_id" }).select("id,student_id,status,late_minutes"); if (error) { setError(error.message); setBusy(false); return; } setSessions(sessions.map((s) => s.id === session.id ? { ...s, records: (data || []).map((r) => ({ id: r.id, studentId: r.student_id, status: r.status, lateMinutes: r.late_minutes })) } : s)); setBusy(false); }
   async function complete() { if (!session) return; setBusy(true); const now = new Date(); const local = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:00`; const { error } = await createClient().from("attendance_sessions").update({ status: "completed", actual_end_time: local }).eq("id", session.id); if (error) { setError(error.message); setBusy(false); return; } setSessions(sessions.map((s) => s.id === session.id ? { ...s, status: "completed" } : s)); setSelected(""); setBusy(false); }
 
   if (showExclusions && isPrincipal) return <ExcusalManager schoolId={schoolId} userId={userId} students={initial.students} offerings={initial.offerings} rows={excusals} setRows={setExcusals} onClose={() => setShowExclusions(false)} />;
-  if (offering && session?.status === "active") return <><div className="page-title"><div><h1>Live attendance</h1><p>Attendance only counts after a class is started.</p></div></div>{error && <p className="form-error attendance-error">{error}</p>}{lateTarget && <section className="card late-entry" role="dialog" aria-label="Record late arrival"><div><b>How many minutes late?</b><small>{initial.students.find((s) => s.id === lateTarget)?.name}</small></div><input type="number" min="0" autoFocus value={lateValue} onChange={(e) => setLateValue(e.target.value)} /><button className="secondary" onClick={() => setLateTarget(null)}>Cancel</button><button className="primary" onClick={() => persistMark(lateTarget, "late", Math.max(0, Number(lateValue) || 0))}>Save late mark</button></section>}<div className="card live-roster"><div className="live-head"><div><span className="live-label"><i /> LIVE CLASS</span><h2>{offering.className}</h2><p>{offering.periodName} · Started {time(session.startTime)} · {roster.length} students</p></div><button className="secondary" disabled={busy} onClick={complete}>Complete class</button></div><button className="mark-all" disabled={busy || !roster.length} onClick={markAll}><Check /> Mark all present</button>{roster.length ? roster.map((student) => { const record = session.records.find((r) => r.studentId === student.id); const excusal = applicableExcusal(student.id, offering.id); return <div className="roster-row" key={student.id}><div className="person"><span className="avatar small">{student.name.split(" ").map((n) => n[0]).join("")}</span><span><b>{student.name}</b>{excusal && <small>Principal excusal{excusal.reason ? ` · ${excusal.reason}` : ""}{excusal.end_date ? ` · through ${new Date(`${excusal.end_date}T12:00:00`).toLocaleDateString()}` : " · ongoing"}</small>}</span></div><div className="segmented">{options.map((option) => <button key={option} className={record?.status === option ? `selected ${option}` : ""} onClick={() => mark(student.id, option)}>{labels[option]}{option === "late" && record?.status === "late" ? ` · ${record.lateMinutes}m` : ""}</button>)}</div></div>; }) : <div className="empty-state"><Users /><p>No students are assigned to this period yet. Add them under Setup → Assignments.</p></div>}</div></>;
+  if (offering && session?.status === "active") return <><div className="page-title"><div><h1>Live attendance</h1><p>Click once for on time. Double-click to record the student’s arrival right now.</p></div></div>{error && <p className="form-error attendance-error">{error}</p>}{lateTarget && <section className="card late-entry" role="dialog" aria-label="Correct late arrival"><div><b>Correct late minutes</b><small>{initial.students.find((s) => s.id === lateTarget)?.name}</small></div><input type="number" min="0" autoFocus value={lateValue} onChange={(e) => setLateValue(e.target.value)} /><button className="secondary" onClick={() => setLateTarget(null)}>Cancel</button><button className="primary" onClick={() => persistMark(lateTarget, "late", Math.max(0, Number(lateValue) || 0))}>Save correction</button></section>}<div className="card live-roster"><div className="live-head"><div><span className="live-label"><i /> LIVE CLASS</span><h2>{offering.className}</h2><p>{offering.periodName} · Scheduled {time(offering.startTime)} · Started {time(session.startTime)} · {roster.length} students</p></div><button className="secondary" disabled={busy} onClick={complete}>Complete class</button></div><button className="mark-all" disabled={busy || !roster.length} onClick={markAll}><Check /> Mark all present</button>{roster.length ? roster.map((student) => { const record = session.records.find((r) => r.studentId === student.id); const excusal = applicableExcusal(student.id, offering.id); return <div className="roster-row" key={student.id}><div className="person"><span className="avatar small">{student.name.split(" ").map((n) => n[0]).join("")}</span><span><b>{student.name}</b>{record && <small className={`attendance-result ${record.status}`}>{labels[record.status]}{record.status === "late" ? ` · ${record.lateMinutes} min late` : ""}</small>}{excusal && <small>Principal excusal{excusal.reason ? ` · ${excusal.reason}` : ""}{excusal.end_date ? ` · through ${new Date(`${excusal.end_date}T12:00:00`).toLocaleDateString()}` : " · ongoing"}</small>}</span></div><div className="arrival-actions"><button className={`arrival-button ${record?.status || ""}`} disabled={savingStudent === student.id || !!excusal} onClick={() => checkIn(student.id)} onDoubleClick={() => checkInNow(student.id)} aria-label={`Check in ${student.name}. Click once for on time; double-click for arrival now.`}>{savingStudent === student.id ? "Saving…" : record ? <><Check /> {record.status === "late" ? `${record.lateMinutes}m late` : labels[record.status]}</> : <><Check /> Check in</>}<small>1× on time · 2× arrival now</small></button><details className="attendance-more"><summary aria-label={`More attendance choices for ${student.name}`}><ChevronDown /></summary><div className="segmented">{options.map((option) => <button key={option} className={record?.status === option ? `selected ${option}` : ""} disabled={savingStudent === student.id} onClick={() => mark(student.id, option)}>{labels[option]}{option === "late" && record?.status === "late" ? ` · ${record.lateMinutes}m` : ""}</button>)}</div></details></div></div>; }) : <div className="empty-state"><Users /><p>No students are assigned to this period yet. Add them under Setup → Assignments.</p></div>}</div></>;
   return <><div className="page-title"><div><h1>Today’s classes</h1><p>{new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric" }).format(new Date())} · {initial.offerings.length} scheduled blocks</p></div>{isPrincipal && <button className="secondary" onClick={() => setShowExclusions(true)}><ShieldCheck /> Manage excusals</button>}</div>{error && <p className="form-error attendance-error">{error}</p>}<div className="class-list">{initial.offerings.length ? initial.offerings.map((o) => { const existing = sessions.find((s) => s.offeringId === o.id); return <div className="card class-card" key={o.id}><div className="class-time"><Clock3 /><b>{time(o.startTime)}–{time(o.endTime)}</b></div><div><h3>{o.className}</h3><p>{o.subject} · {o.studentIds.length} students · {o.periodName}</p></div>{existing?.status === "completed" ? <span className="status good">Completed</span> : existing ? <button className="primary" onClick={() => setSelected(o.id)}>Resume <ChevronRight size={17} /></button> : <button className="primary" disabled={busy} onClick={() => start(o.id)}>Start class <ChevronRight size={17} /></button>}</div>; }) : <div className="card empty-state"><Clock3 /><p>No class offerings are scheduled for today. A principal can create them in Setup.</p></div>}</div></>;
 }
 
