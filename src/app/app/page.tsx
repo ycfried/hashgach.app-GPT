@@ -127,16 +127,18 @@ export default async function ProtectedApp() {
       ),
     supabase
       .from("schedule_templates")
-      .select("id,name,default_anchor_time,active")
+      .select("id,name,default_anchor_time,active,print_design")
       .eq("active", true)
       .order("created_at"),
     supabase
       .from("schedule_blocks")
-      .select("id,template_id,name,position,duration_minutes,gap_after_minutes")
+      .select(
+        "id,template_id,name,position,duration_minutes,gap_after_minutes,rule_type,fixed_start_time",
+      )
       .order("position"),
     supabase
       .from("schedule_instances")
-      .select("id,template_id,date,anchor_start_time,calculated_blocks")
+      .select("id,template_id,date,label,anchor_start_time,calculated_blocks")
       .order("date", { ascending: false })
       .limit(30),
     supabase
