@@ -24,6 +24,7 @@ import {
   UserPlus,
   Users,
   X,
+  UserRound,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import SetupView, {
@@ -63,18 +64,38 @@ type View =
   | "Setup"
   | "Admin";
 
-const nav: { label: View; icon: typeof Home }[] = [
-  { label: "Dashboard", icon: Home },
-  { label: "Students", icon: Users },
-  { label: "Attendance", icon: ClipboardCheck },
-  { label: "Discipline", icon: ShieldCheck },
-  { label: "Grades", icon: GraduationCap },
-  { label: "Schedule", icon: CalendarDays },
-  { label: "Mentoring", icon: MessageCircle },
-  { label: "Reports", icon: FileBarChart },
-  { label: "Messages", icon: MessageCircle },
-  { label: "Staff", icon: UserPlus },
-  { label: "Setup", icon: Settings },
+const navGroups: { title: string; items: { label: View; icon: typeof Home }[] }[] = [
+  {
+    title: "Daily work",
+    items: [
+      { label: "Dashboard", icon: Home },
+      { label: "Attendance", icon: ClipboardCheck },
+      { label: "Schedule", icon: CalendarDays },
+      { label: "Messages", icon: MessageCircle },
+    ],
+  },
+  {
+    title: "Student life",
+    items: [
+      { label: "Students", icon: Users },
+      { label: "Discipline", icon: ShieldCheck },
+      { label: "Mentoring", icon: MessageCircle },
+    ],
+  },
+  {
+    title: "Academics",
+    items: [
+      { label: "Grades", icon: GraduationCap },
+      { label: "Reports", icon: FileBarChart },
+    ],
+  },
+  {
+    title: "Administration",
+    items: [
+      { label: "Staff", icon: UserPlus },
+      { label: "Setup", icon: Settings },
+    ],
+  },
 ];
 
 export type StudentRow = {
@@ -156,6 +177,7 @@ function Dashboard({
   discipline,
   grades,
   mentoring,
+  setup,
 }: {
   onView: (v: View) => void;
   name: string;
@@ -163,6 +185,7 @@ function Dashboard({
   discipline: DisciplineBundle;
   grades: GradesBundle;
   mentoring: MentoringBundle;
+  setup: SetupBundle;
 }) {
   const records = attendance.sessions.flatMap((s) => s.records);
   const present = records.filter((r) => r.status === "present").length;
@@ -200,6 +223,22 @@ function Dashboard({
           <Plus size={18} /> Start a class
         </button>
       </div>
+      {setup.students.length === 0 || setup.offerings.length === 0 ? (
+        <section className="setup-guide" aria-label="School setup progress">
+          <div>
+            <span className="eyebrow">Getting started</span>
+            <h2>Prepare your school workspace</h2>
+            <p>Complete these foundations once, then daily attendance, grades, and reporting will stay connected automatically.</p>
+          </div>
+          <ol>
+            <li className={setup.staff.length ? "done" : ""}><span>{setup.staff.length ? "✓" : "1"}</span><div><b>Invite your team</b><small>{setup.staff.length ? `${setup.staff.length} staff members ready` : "Add rebbeim and mashpi’im"}</small></div></li>
+            <li className={setup.classes.length && setup.periods.length ? "done" : ""}><span>{setup.classes.length && setup.periods.length ? "✓" : "2"}</span><div><b>Build the school day</b><small>Add periods and classes</small></div></li>
+            <li className={setup.offerings.length ? "done" : ""}><span>{setup.offerings.length ? "✓" : "3"}</span><div><b>Connect classes</b><small>Assign teachers, times, and days</small></div></li>
+            <li className={setup.students.length ? "done" : ""}><span>{setup.students.length ? "✓" : "4"}</span><div><b>Add your bochurim</b><small>Create rosters for daily work</small></div></li>
+          </ol>
+          <button className="primary" onClick={() => onView("Setup")}>Continue setup <ChevronRight /></button>
+        </section>
+      ) : null}
       <section className="metrics">
         <button
           className="metric featured"
@@ -377,6 +416,7 @@ function StudentsView({
   const [archiveCandidate, setArchiveCandidate] = useState<StudentRow | null>(
     null,
   );
+  const [selected, setSelected] = useState<StudentRow | null>(null);
   const [first, setFirst] = useState("");
   const [last, setLast] = useState("");
   const [year, setYear] = useState("Shiur Alef");
@@ -502,11 +542,9 @@ function StudentsView({
         )}
       </div>
       {archiveCandidate && (
-        <section
-          className="card archive-confirm"
-          role="dialog"
-          aria-label="Archive student"
-        >
+        <div className="dialog-layer" role="presentation">
+        <button className="dialog-backdrop" aria-label="Close confirmation" onClick={() => setArchiveCandidate(null)} />
+        <section className="dialog-card archive-confirm" role="dialog" aria-modal="true" aria-label="Archive student">
           <div>
             <b>Archive {archiveCandidate.name}?</b>
             <small>
@@ -528,9 +566,14 @@ function StudentsView({
             {busy ? "Archiving…" : "Archive student"}
           </button>
         </section>
+        </div>
       )}
       {(adding || editing) && (
-        <div className="card quick-form">
+        <div className="drawer-layer" role="presentation">
+        <button className="drawer-backdrop" aria-label="Close student editor" onClick={() => { setAdding(false); setEditing(null); }} />
+        <aside className="drawer" role="dialog" aria-modal="true" aria-label={editing ? "Edit student" : "Add student"}>
+          <div className="drawer-head"><div><span className="eyebrow">Student record</span><h2>{editing ? "Edit student" : "Add a student"}</h2><p>Keep the core profile concise. Class and mentoring assignments are managed from their own workspaces.</p></div><button className="icon-action" onClick={() => { setAdding(false); setEditing(null); }} aria-label="Close"><X /></button></div>
+        <div className="drawer-body quick-form">
           <label>
             First name
             <input value={first} onChange={(e) => setFirst(e.target.value)} />
@@ -567,6 +610,8 @@ function StudentsView({
             </button>
           </div>
           {error && <p className="form-error">{error}</p>}
+        </div>
+        </aside>
         </div>
       )}
       <div className="toolbar">
@@ -614,7 +659,7 @@ function StudentsView({
                           .map((n) => n[0])
                           .join("")}
                       </span>
-                      <b>{s.name}</b>
+                      <button className="person-link" onClick={() => setSelected(s)}>{s.name}</button>
                     </div>
                   </td>
                   <td>{s.year}</td>
@@ -662,6 +707,23 @@ function StudentsView({
           </tbody>
         </table>
       </div>
+      {selected && (
+        <div className="drawer-layer" role="presentation">
+          <button className="drawer-backdrop" aria-label="Close student details" onClick={() => setSelected(null)} />
+          <aside className="drawer detail-drawer" role="dialog" aria-modal="true" aria-label={`${selected.name} details`}>
+            <div className="drawer-head"><div className="person detail-person"><span className="avatar">{selected.name.split(" ").map((n) => n[0]).slice(0, 2).join("")}</span><div><span className="eyebrow">Student profile</span><h2>{selected.name}</h2><p>{selected.year}</p></div></div><button className="icon-action" onClick={() => setSelected(null)} aria-label="Close"><X /></button></div>
+            <div className="drawer-body">
+              <section className="detail-summary">
+                <div><small>Today</small><Status>{selected.status}</Status></div>
+                <div><small>Current grade</small><strong>{selected.grade ? `${selected.grade}%` : "No grades yet"}</strong></div>
+                <div><small>Mashpia</small><strong>{selected.mentor}</strong></div>
+              </section>
+              <section className="context-panel"><UserRound /><div><h3>One student, one story</h3><p>Attendance, grades, discipline, and mentoring stay connected to this profile. Open Reports for the complete timeline and official summaries.</p></div></section>
+              <div className="drawer-actions"><button className="secondary" onClick={() => setSelected(null)}>Close</button>{isPrincipal && <button className="primary" onClick={() => { openEdit(selected); setSelected(null); }}>Edit student</button>}</div>
+            </div>
+          </aside>
+        </div>
+      )}
     </>
   );
 }
@@ -1119,7 +1181,7 @@ export function AppShell({
     ? mentoringData.assignments.filter((a) => a.flagged).length +
       mentoringData.noteRequests.filter((r) => r.status === "pending").length
     : disciplineData.records.filter((r) => r.status === "pending").length;
-  const allowed = nav.filter((item) =>
+  const isAllowed = (label: View) =>
     !schoolId
       ? [
           "Dashboard",
@@ -1128,8 +1190,8 @@ export function AppShell({
           "Schedule",
           "Mentoring",
           "Reports",
-        ].includes(item.label)
-      : (item.label !== "Setup" || !!schoolId) &&
+        ].includes(label)
+      : (label !== "Setup" || !!schoolId) &&
         (isPrincipal ||
           (isMashpia
             ? [
@@ -1138,9 +1200,11 @@ export function AppShell({
                 "Mentoring",
                 "Reports",
                 "Messages",
-              ].includes(item.label)
-            : item.label !== "Staff")),
-  );
+              ].includes(label)
+            : label !== "Staff"));
+  const allowedGroups = navGroups
+    .map((group) => ({ ...group, items: group.items.filter((item) => isAllowed(item.label)) }))
+    .filter((group) => group.items.length);
   const content =
     view === "Dashboard" ? (
       <Dashboard
@@ -1150,6 +1214,7 @@ export function AppShell({
         discipline={disciplineData}
         grades={gradesData}
         mentoring={mentoringData}
+        setup={setupData}
       />
     ) : view === "Students" ? (
       <StudentsView
@@ -1231,8 +1296,11 @@ export function AppShell({
             <X />
           </button>
         </div>
-        <nav>
-          {allowed.map(({ label, icon: Icon }) => (
+        <nav aria-label="Primary navigation">
+          {allowedGroups.map((group) => (
+            <div className="nav-group" key={group.title}>
+              <span className="nav-group-label">{group.title}</span>
+              {group.items.map(({ label, icon: Icon }) => (
             <button
               key={label}
               className={view === label ? "active" : ""}
@@ -1255,6 +1323,8 @@ export function AppShell({
                   </em>
                 )}
             </button>
+              ))}
+            </div>
           ))}
         </nav>
         <div className="side-bottom">
