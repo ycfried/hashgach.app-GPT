@@ -19,3 +19,5 @@ A bilingual, mobile-first yeshiva management platform built with Next.js, Supaba
 3. Run `npm run dev`.
 
 The migration in `supabase/migrations` defines the v1 data foundation, tenant-aware RLS, audit logging, automatic lateness consequences, and fine escalation.
+
+<!-- Deployment trigger: refresh Vercel production from the connected main branch. -->
