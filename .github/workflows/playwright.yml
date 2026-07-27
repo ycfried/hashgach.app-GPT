@@ -1,0 +1,56 @@
+name: Playwright
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  public-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e:public
+        env:
+          PLAYWRIGHT_BASE_URL: https://hashgacha-app.vercel.app
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14
+
+  authenticated-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e:auth
+        env:
+          PLAYWRIGHT_BASE_URL: https://hashgacha-app.vercel.app
+          E2E_PRINCIPAL_EMAIL: ${{ secrets.E2E_PRINCIPAL_EMAIL }}
+          E2E_PRINCIPAL_PASSWORD: ${{ secrets.E2E_PRINCIPAL_PASSWORD }}
+          E2E_REBBI_EMAIL: ${{ secrets.E2E_REBBI_EMAIL }}
+          E2E_REBBI_PASSWORD: ${{ secrets.E2E_REBBI_PASSWORD }}
+          E2E_MASHPIA_EMAIL: ${{ secrets.E2E_MASHPIA_EMAIL }}
+          E2E_MASHPIA_PASSWORD: ${{ secrets.E2E_MASHPIA_PASSWORD }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: authenticated-playwright-report
+          path: playwright-report/
+          retention-days: 14
